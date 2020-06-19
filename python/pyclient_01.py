@@ -22,6 +22,7 @@ MESSAGES_MAX = 5 # Temporary
 RECV_COUNT_MAX = 0x7FFF # Temporary
 
 #msgqueue = queue.Queue()
+clientevent = threading.Event()
 
 def pyclientthread(xhost, xport, xheaderformat, xheadersize, xbuffersize):
     '''
@@ -47,6 +48,9 @@ def pyclientthread(xhost, xport, xheaderformat, xheadersize, xbuffersize):
     while conn_attempts < CONN_ATTEMPTS_MAX:
         conn_attempts += 1
         try:
+            if clientevent.is_set():
+                print("Client event is set!")
+                break
             pyclient.connect((HOST, PORT))
             conn_setup = True
             print(f"Connected to server!")
@@ -54,8 +58,6 @@ def pyclientthread(xhost, xport, xheaderformat, xheadersize, xbuffersize):
         except socket.error as emsg:
             print(f"socket.error exception: {emsg}")
             time.sleep(2)
-        except TypeError as emsg:
-            print(f"TypeError exception: {emsg}")
 
     msglen = 0
     msgtype = 0
@@ -73,13 +75,16 @@ def pyclientthread(xhost, xport, xheaderformat, xheadersize, xbuffersize):
                 msg = pyclient.recv(xbuffersize)
             except socket.error as emsg:
                 print(f"socket.error exception: {emsg}")
+                recv_count = RECV_COUNT_MAX
+                total_messages = MESSAGES_MAX
             
             recv_count += 1
 
             if len(msg) == 0:
-                recv_count += 1
-                print("Skipping...")
-                continue
+                print("Skipping recv iterations...")
+                total_messages += 1
+                time.sleep(1)
+                break
 
             bytes_read += xbuffersize
 
@@ -108,12 +113,25 @@ def pyclientthread(xhost, xport, xheaderformat, xheadersize, xbuffersize):
         pyclient.shutdown(1)
         pyclient.close()
         conn_setup = False
-    
+        clientevent.set()
+        
     
 thr1 = threading.Thread(target=pyclientthread, args=(HOST, PORT, HEADER_FORMAT, HEADER_SIZE, BUFFER_SIZE, ))
 #thr2 = threading.Thread(target=mt.get_message, args=(msg, msgqueue, ))
 thr1.start()
 #thr2.start()
+
+# Main Thread
+while True:
+    try:
+        if clientevent.is_set():
+            print("Client event is set!")
+            break
+        time.sleep(1)
+    except KeyboardInterrupt:
+        clientevent.set()
+        break
+
 thr1.join()
 #thr2.join()
 
