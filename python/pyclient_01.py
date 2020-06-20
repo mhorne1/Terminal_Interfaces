@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[2]:
 
 
 import socket
 import struct
 import threading
 import time
-#import queue
+import queue
 
 import messagetools as mt
 
@@ -21,10 +21,10 @@ CONN_ATTEMPTS_MAX = 20 # Temporary
 MESSAGES_MAX = 5 # Temporary
 RECV_COUNT_MAX = 0x7FFF # Temporary
 
-#msgqueue = queue.Queue()
+recqueue = queue.Queue()
 clientevent = threading.Event()
 
-def pyclientthread(xhost, xport, xheaderformat, xheadersize, xbuffersize):
+def client_thread(xhost, xport, xheaderformat, xheadersize, xbuffersize, xrecqueue):
     '''
     Creates socket, connects to server, and processes messages from server
     Parameters
@@ -34,6 +34,7 @@ def pyclientthread(xhost, xport, xheaderformat, xheadersize, xbuffersize):
     xheaderformat : String describing header struct, e.g. "!2I2F"
     xheadersize : Total number of bytes in header struct
     xbuffersize : Number of bytes allocated to buffer
+    xrecqueue : Queue that can contain new messages to be recorded
     Returns
     -------
     None
@@ -103,7 +104,9 @@ def pyclientthread(xhost, xport, xheaderformat, xheadersize, xbuffersize):
                     full_msg += msg.decode("utf-8")
 
             if bytes_read >= msglen:
-                mt.printstamp(full_msg)
+                #mt.printstamp(full_msg)
+                print(mt.get_timestamp(full_msg))
+                xrecqueue.put(full_msg)
                 break
 
         total_messages += 1
@@ -114,12 +117,32 @@ def pyclientthread(xhost, xport, xheaderformat, xheadersize, xbuffersize):
         pyclient.close()
         conn_setup = False
         clientevent.set()
+
+def record_thread(rec_queue):
+    '''
+    Records received messages that are relayed with a queue
+    Parameters
+    ----------
+    rec_queue : Queue that can contain new messages to be recorded
+    Returns
+    -------
+    None
+    '''
+    rec_name = mt.get_datetime_name()
+    #while clientevent.is_set() == False:
+    while True:
+        if rec_queue.empty() == False:
+            mt.record_message(rec_name, mt.get_timestamp(rec_queue.get()))
         
-    
-thr1 = threading.Thread(target=pyclientthread, args=(HOST, PORT, HEADER_FORMAT, HEADER_SIZE, BUFFER_SIZE, ))
-#thr2 = threading.Thread(target=mt.get_message, args=(msg, msgqueue, ))
+        if clientevent.is_set(): # Check after recording
+            break
+        
+        time.sleep(1)
+
+thr1 = threading.Thread(target=client_thread, args=(HOST, PORT, HEADER_FORMAT, HEADER_SIZE, BUFFER_SIZE, recqueue, ))
+thr2 = threading.Thread(target=record_thread, args=(recqueue, ))
 thr1.start()
-#thr2.start()
+thr2.start()
 
 # Main Thread
 while True:
@@ -133,7 +156,11 @@ while True:
         break
 
 thr1.join()
-#thr2.join()
+thr2.join()
+
+while not recqueue.empty():
+    recqueue.get()
+print(f"recqueue is empty")
 
 print("EOF")
 

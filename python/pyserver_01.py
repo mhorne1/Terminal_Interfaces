@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[2]:
 
 
 import socket
@@ -27,6 +27,8 @@ msg = "Server Message: 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTU
 
 messagetype = 1 # String message
 
+
+
 def server_thread(xhost, xport, xheaderformat, xmsgtype, xmsgqueue):
     '''
     Creates socket, waits for connection by client, and sends messages to clients
@@ -42,58 +44,67 @@ def server_thread(xhost, xport, xheaderformat, xmsgtype, xmsgqueue):
     None
     '''
     print("Running pyserver thread...")
-    pyserver = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    pyserver.bind((xhost, xport))
-    pyserver.listen(5)
-    
     xmsg = ""
-    
     msg_delay = 3 # Number of seconds between sending each message
-    
     conn_count = 0
     send_count = 0
+    xmsgnumber = 1 # Initial message number
     
-    xmsgnumber = 1
-    
-    while conn_count < CONN_COUNT_MAX:
-        conn_count += 1
-        print("Listening for client...")
-        clientsocket, clientaddress = pyserver.accept()
-        with clientsocket:
-            print(f"Connection from {clientaddress}")
-            send_count = 0
-            while send_count < SEND_COUNT_MAX:
-                fullmsg = ""
-                if serverevent.is_set():
-                    clientsocket.close()
-                    conn_count = CONN_COUNT_MAX
-                    break
-                elif xmsgqueue.empty() == False:
-                    print("Thread getting message from queue")
-                    xmsg = xmsgqueue.get()
-                elif xmsg == "":
-                    print("Waiting for message")
-                    time.sleep(1)
-                    continue
-                xmsglen = len(xmsg)
-                headerpacked = struct.pack(xheaderformat, xmsglen, xmsgtype, xmsgnumber)
-                xmsgnumber += 1
-                if xmsgtype == 1:
-                    packedmsg = mt.msg_type1_pack(xmsg)
-                fullmsg = headerpacked + packedmsg
-                try:
+    #pyserver = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as pyserver:
+        pyserver.bind((xhost, xport))
+        pyserver.listen(5)
+
+        while conn_count < CONN_COUNT_MAX:
+            conn_count += 1
+            print("Listening for client...")
+            clientsocket, clientaddress = pyserver.accept()
+            with clientsocket:
+                print(f"Connection from {clientaddress}")
+                send_count = 0
+                while send_count < SEND_COUNT_MAX:
+                    fullmsg = b""
+
+                    if serverevent.is_set():
+                        clientsocket.close()
+                        conn_count = CONN_COUNT_MAX
+                        break
+                    elif xmsgqueue.empty() == False:
+                        print("Thread getting message from queue")
+                        xmsg = xmsgqueue.get()
+                    elif xmsg == "":
+                        print("Waiting for message")
+                        time.sleep(1)
+                        continue
+                    '''
+                    if xmsgtype == 1:
+                        packedmsg = mt.msg_type1_pack(xmsg)
+                    '''
+                    packedmsg = mt.msg_packer(xmsgtype, xmsg)
+                    xmsglen = len(packedmsg)
+                    packedheader = struct.pack(xheaderformat, xmsglen, xmsgtype, xmsgnumber)
+                    xmsgnumber += 1
+                    fullmsg = packedheader + packedmsg
+                    '''
+                    try:
+                        clientsocket.send(fullmsg)
+                    except socket.error as emsg:
+                        print(f"socket.error exception: {emsg}")
+                    '''
                     clientsocket.send(fullmsg)
-                except socket.error as emsg:
-                    print(f"socket.error exception: {emsg}")
-                send_count += 1
-                time.sleep(msg_delay)
-        #send_count = 0
+                    send_count += 1
+                    time.sleep(msg_delay)
+            #send_count = 0
     print("Shutting down pyserver thread!")
-    pyserver.close()
+    #pyserver.close()
     serverevent.set()
-    
+
+def input_thread(xmsgqueue):
+    mt.get_message(xmsgqueue)
+
 thr1 = threading.Thread(target=server_thread, args=(HOST, PORT, HEADER_FORMAT, messagetype, msgqueue, ))
-thr2 = threading.Thread(target=mt.get_message, args=(msgqueue, ))
+#thr2 = threading.Thread(target=mt.get_message, args=(msgqueue, ))
+thr2 = threading.Thread(target=input_thread, args=(msgqueue, ))
 thr1.start()
 thr2.start()
 
