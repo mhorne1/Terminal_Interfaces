@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2]:
+# In[1]:
 
 
 import socket
@@ -19,15 +19,13 @@ HEADER_FORMAT = "!IHI"
 CONN_COUNT_MAX = 1 # Temporary
 SEND_COUNT_MAX = 5 # Temporary
 
-msgqueue = queue.Queue()
+msg_q = queue.Queue() # Queue for sending messages
 serverevent = threading.Event()
 
 #msg = "Server Message: 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!\"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~ \t\n\r\x0b\x0c"
 msg = "Server Message: 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 messagetype = 1 # String message
-
-
 
 def server_thread(xhost, xport, xheaderformat, xmsgtype, xmsgqueue):
     '''
@@ -36,7 +34,7 @@ def server_thread(xhost, xport, xheaderformat, xmsgtype, xmsgqueue):
     ----------
     xhost : IP address
     xport : Port number
-    xheaderformat : String describing header struct, e.g. "!2I2F"
+    xheaderformat : String describing header struct, e.g. "!4I4d"
     xmsgtype : Number indicating type of message
     xmsgqueue : Queue that can contain new messages to be sent
     Returns
@@ -47,10 +45,8 @@ def server_thread(xhost, xport, xheaderformat, xmsgtype, xmsgqueue):
     xmsg = ""
     msg_delay = 3 # Number of seconds between sending each message
     conn_count = 0
-    send_count = 0
     xmsgnumber = 1 # Initial message number
     
-    #pyserver = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as pyserver:
         pyserver.bind((xhost, xport))
         pyserver.listen(5)
@@ -61,63 +57,62 @@ def server_thread(xhost, xport, xheaderformat, xmsgtype, xmsgqueue):
             clientsocket, clientaddress = pyserver.accept()
             with clientsocket:
                 print(f"Connection from {clientaddress}")
-                send_count = 0
-                while send_count < SEND_COUNT_MAX:
+                while True:
                     fullmsg = b""
-
                     if serverevent.is_set():
                         clientsocket.close()
                         conn_count = CONN_COUNT_MAX
                         break
-                    elif xmsgqueue.empty() == False:
-                        print("Thread getting message from queue")
+                    elif xmsgqueue.empty():
+                        #time.sleep(1)
+                        #continue
+                        break
+                    elif not xmsgqueue.empty():
+                        #print("Thread getting message from queue")
                         xmsg = xmsgqueue.get()
-                    elif xmsg == "":
-                        print("Waiting for message")
-                        time.sleep(1)
-                        continue
-                    '''
-                    if xmsgtype == 1:
-                        packedmsg = mt.msg_type1_pack(xmsg)
-                    '''
-                    packedmsg = mt.msg_packer(xmsgtype, xmsg)
-                    xmsglen = len(packedmsg)
-                    packedheader = struct.pack(xheaderformat, xmsglen, xmsgtype, xmsgnumber)
-                    xmsgnumber += 1
-                    fullmsg = packedheader + packedmsg
-                    '''
-                    try:
-                        clientsocket.send(fullmsg)
-                    except socket.error as emsg:
-                        print(f"socket.error exception: {emsg}")
-                    '''
-                    clientsocket.send(fullmsg)
-                    send_count += 1
-                    time.sleep(msg_delay)
-            #send_count = 0
+                        packedmsg = mt.msg_packer(mt.msg_dict, xmsgtype, xmsg)
+                        xmsglen = len(packedmsg)
+                        packedheader = struct.pack(xheaderformat, xmsglen, xmsgtype, xmsgnumber)
+                        xmsgnumber += 1
+                        fullmsg = packedheader + packedmsg
+                        try:
+                            clientsocket.send(fullmsg)
+                        except socket.error as emsg:
+                            print(f"socket.error exception: {emsg}")
+                            break
+                        time.sleep(msg_delay)
     print("Shutting down pyserver thread!")
     #pyserver.close()
-    serverevent.set()
+    if not serverevent.is_set():
+        serverevent.set()
 
 def input_thread(xmsgqueue):
+    '''
+    Prompts user to enter new messages that will be addeded to message queue
+    Parameters
+    ----------
+    xmsgqueue : Queue that can contain new messages to be sent
+    Returns
+    -------
+    None
+    '''
     mt.get_message(xmsgqueue)
 
-thr1 = threading.Thread(target=server_thread, args=(HOST, PORT, HEADER_FORMAT, messagetype, msgqueue, ))
-#thr2 = threading.Thread(target=mt.get_message, args=(msgqueue, ))
-thr2 = threading.Thread(target=input_thread, args=(msgqueue, ))
+thr1 = threading.Thread(target=server_thread, args=(HOST, PORT, HEADER_FORMAT, messagetype, msg_q, ))
+thr2 = threading.Thread(target=input_thread, args=(msg_q, ))
 thr1.start()
 thr2.start()
 
 # Main Thread
-time.sleep(0.1)
-print("Adding default message to queue")
-msgqueue.put(msg)
+for _ in range(5):
+    msg_q.put(msg)
 while True:
     try:
         if serverevent.is_set():
             print("Pyserver event is set!")
             break
-        time.sleep(1)
+        else:
+            time.sleep(1)
     except KeyboardInterrupt:
         serverevent.set()
         break
@@ -125,9 +120,9 @@ while True:
 thr1.join()
 thr2.join()
 
-while not msgqueue.empty():
-    msgqueue.get()
-print(f"msgqueue is empty")
+while not msg_q.empty():
+    msg_q.get()
+print(f"msg_q is empty")
 
 print("EOF")
 

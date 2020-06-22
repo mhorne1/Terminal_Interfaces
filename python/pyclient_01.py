@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2]:
+# In[1]:
 
 
 import socket
@@ -21,7 +21,7 @@ CONN_ATTEMPTS_MAX = 20 # Temporary
 MESSAGES_MAX = 5 # Temporary
 RECV_COUNT_MAX = 0x7FFF # Temporary
 
-recqueue = queue.Queue()
+rec_q = queue.Queue() # Queue for recording messages
 clientevent = threading.Event()
 
 def client_thread(xhost, xport, xheaderformat, xheadersize, xbuffersize, xrecqueue):
@@ -31,7 +31,7 @@ def client_thread(xhost, xport, xheaderformat, xheadersize, xbuffersize, xrecque
     ----------
     xhost : IP address
     xport : Port number
-    xheaderformat : String describing header struct, e.g. "!2I2F"
+    xheaderformat : String describing header struct, e.g. "!4I4d"
     xheadersize : Total number of bytes in header struct
     xbuffersize : Number of bytes allocated to buffer
     xrecqueue : Queue that can contain new messages to be recorded
@@ -45,6 +45,10 @@ def client_thread(xhost, xport, xheaderformat, xheadersize, xbuffersize, xrecque
 
     conn_setup = False
     conn_attempts = 0
+    msglen = 0
+    msgtype = 0
+    msgnumber = 0
+    total_messages = 0
 
     while conn_attempts < CONN_ATTEMPTS_MAX:
         conn_attempts += 1
@@ -60,57 +64,49 @@ def client_thread(xhost, xport, xheaderformat, xheadersize, xbuffersize, xrecque
             print(f"socket.error exception: {emsg}")
             time.sleep(2)
 
-    msglen = 0
-    msgtype = 0
-    msgnumber = 0
-    total_messages = 0
-
     while (conn_setup == True) and (total_messages < MESSAGES_MAX):
         new_msg = True
-        full_msg = ''
+        full_msg = b""
         recv_count = 0
         bytes_read = 0
+        
         while recv_count < RECV_COUNT_MAX:
-
             try:
                 msg = pyclient.recv(xbuffersize)
             except socket.error as emsg:
                 print(f"socket.error exception: {emsg}")
-                recv_count = RECV_COUNT_MAX
                 total_messages = MESSAGES_MAX
+                break
             
+            bytes_read += xbuffersize
             recv_count += 1
 
             if len(msg) == 0:
-                print("Skipping recv iterations...")
+                print("Message length is 0... Skipping...")
                 total_messages += 1
                 time.sleep(1)
                 break
-
-            bytes_read += xbuffersize
-
-            if new_msg:
+            elif new_msg:
                 new_msg = False
                 msgheaderunpacked = struct.unpack(xheaderformat, msg[:xheadersize])
                 msglen = msgheaderunpacked[0]
                 msgtype = msgheaderunpacked[1]
                 msgnumber = msgheaderunpacked[2]
                 print(f"msglen is: {msglen}, msgtype is: {msgtype}, msgnumber is: {msgnumber}")
-
-                if msgtype == 1:
-                    full_msg += msg[xheadersize:].decode("utf-8")
+                full_msg = msg[xheadersize:]
             else:
-                if msgtype == 1:
-                    full_msg += msg.decode("utf-8")
-
+                full_msg += msg
+            
             if bytes_read >= msglen:
-                #mt.printstamp(full_msg)
-                print(mt.get_timestamp(full_msg))
-                xrecqueue.put(full_msg)
+                if msgtype == 1:
+                    text_msg = full_msg.decode("utf-8")
+                    print(mt.get_timestamp(text_msg))
+                    xrecqueue.put(text_msg)
+                elif msgtype == 2:
+                    print(struct.unpack("!4I4d", full_msg[:msglen]))
                 break
-
         total_messages += 1
-
+    
     if conn_setup == True:
         print("Shutting down pyclient thread!")
         pyclient.shutdown(1)
@@ -120,7 +116,7 @@ def client_thread(xhost, xport, xheaderformat, xheadersize, xbuffersize, xrecque
 
 def record_thread(rec_queue):
     '''
-    Records received messages that are relayed with a queue
+    Records messages that are retrieved from a queue
     Parameters
     ----------
     rec_queue : Queue that can contain new messages to be recorded
@@ -128,19 +124,18 @@ def record_thread(rec_queue):
     -------
     None
     '''
-    rec_name = mt.get_datetime_name()
-    #while clientevent.is_set() == False:
+    dir_name = mt.get_datetime_name()
     while True:
         if rec_queue.empty() == False:
-            mt.record_message(rec_name, mt.get_timestamp(rec_queue.get()))
+            mt.record_message(dir_name, mt.get_timestamp(rec_queue.get()))
         
         if clientevent.is_set(): # Check after recording
             break
         
         time.sleep(1)
 
-thr1 = threading.Thread(target=client_thread, args=(HOST, PORT, HEADER_FORMAT, HEADER_SIZE, BUFFER_SIZE, recqueue, ))
-thr2 = threading.Thread(target=record_thread, args=(recqueue, ))
+thr1 = threading.Thread(target=client_thread, args=(HOST, PORT, HEADER_FORMAT, HEADER_SIZE, BUFFER_SIZE, rec_q, ))
+thr2 = threading.Thread(target=record_thread, args=(rec_q, ))
 thr1.start()
 thr2.start()
 
@@ -158,9 +153,9 @@ while True:
 thr1.join()
 thr2.join()
 
-while not recqueue.empty():
-    recqueue.get()
-print(f"recqueue is empty")
+while not rec_q.empty():
+    rec_q.get()
+print(f"rec_q is empty")
 
 print("EOF")
 

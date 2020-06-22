@@ -8,6 +8,7 @@ import datetime
 import queue
 import time
 import os
+import struct
 
 def get_message(myqueue):
     '''
@@ -18,12 +19,12 @@ def get_message(myqueue):
     -------
     None
     '''
-    time.sleep(0.25) # Delay to avoid overlapping printing from from other threads
+    time.sleep(0.25) # Slight delay to avoid overlapping printing from from other threads
     mymsg = input("Please enter a new message...")
-    print(f"Adding message {mymsg} to queue!")
+    print(f"Adding message '{mymsg}' to queue!")
     myqueue.put(mymsg)
 
-def msg_packer(message_type, message):
+def msg_packer(message_dict, message_type, message):
     '''
     Uses message_type to determine how message is packed
     Parameters
@@ -34,8 +35,8 @@ def msg_packer(message_type, message):
     -------
     Bytes object of message
     '''
-    if message_type == 1:
-        return msg_type1_pack(message)
+    if message_type in message_dict:
+        return message_dict[message_type](message)
     else:
         return b""
     
@@ -51,24 +52,20 @@ def msg_type1_pack(message):
     '''
     return message.encode("utf-8")
 
-def get_timestamp(mytime):
+def msg_type2_pack(message_tuple):
     '''
-    Returns string formatted from datetime object
+    Encodes type 2 messages
     Parameters
     ----------
-    mytime : Datetime object
+    message_tuple : 4 uint32, 4 double
     Returns
     -------
-    Formatted time string
+    Network (big-endian) byte encoded tuple
     '''
-    mystring = ""
-    mystring = str(mytime.hour).zfill(2) \
-    + ":" \
-    + str(mytime.minute).zfill(2) \
-    + ":" \
-    + str(mytime.second).zfill(2) \
-    + "." + str(mytime.microsecond).zfill(6)
-    return mystring
+    STRUCT_FORMAT = "!4I4d"
+    my_tuple = (10, 20, 30, 40, 50.12, 60.34, 70.56, 80.78)
+    #return struct.pack(STRUCT_FORMAT, message_tuple)
+    return struct.pack(STRUCT_FORMAT, *my_tuple)
 
 def get_datetime_name():
     '''
@@ -118,3 +115,8 @@ def record_message(name, message):
         os.mkdir(rec_dir)
     with open(rec_dir+name, 'a+') as my_file:
         my_file.write(message + '\n')
+
+msg_dict = { # Dictionary containing message types and corresponding functions
+    1 : msg_type1_pack,
+    2 : msg_type2_pack,
+}
