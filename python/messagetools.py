@@ -20,27 +20,28 @@ def get_message(myqueue):
     None
     '''
     time.sleep(0.25) # Slight delay to avoid overlapping printing from from other threads
-    mymsg = input("Please enter a new message...")
-    print(f"Adding message '{mymsg}' to queue!")
-    myqueue.put(mymsg)
+    new_msg = input("Please enter a new message...")
+    print(f"Adding message '{new_msg}' to queue!")
+    myqueue.put((1,new_msg))
 
-def msg_packer(message_dict, message_type, message):
+def msg_packer(message_dict, message_type, *message_args):
     '''
     Uses message_type to determine how message is packed
     Parameters
     ----------
+    message_dict : Keys are the message types and values are the packing functions
     message_type : Specific type of message
-    message : Text string or tuple
+    message_args : Text string or tuple
     Returns
     -------
     Bytes object of message
     '''
     if message_type in message_dict:
-        return message_dict[message_type](message)
+        return message_dict[message_type](*message_args)
     else:
         return b""
     
-def msg_type1_pack(message):
+def msg_type1_pack(message_text):
     '''
     Encodes type 1 messages
     Parameters
@@ -50,7 +51,7 @@ def msg_type1_pack(message):
     -------
     Byte encoded text string
     '''
-    return message.encode("utf-8")
+    return message_text.encode("utf-8")
 
 def msg_type2_pack(message_tuple):
     '''
@@ -63,9 +64,7 @@ def msg_type2_pack(message_tuple):
     Network (big-endian) byte encoded tuple
     '''
     STRUCT_FORMAT = "!4I4d"
-    my_tuple = (10, 20, 30, 40, 50.12, 60.34, 70.56, 80.78)
-    #return struct.pack(STRUCT_FORMAT, message_tuple)
-    return struct.pack(STRUCT_FORMAT, *my_tuple)
+    return struct.pack(STRUCT_FORMAT, *message_tuple)
 
 def get_datetime_name():
     '''
@@ -99,7 +98,7 @@ def get_timestamp(message):
     + "." + str(mytime.microsecond).zfill(6)
     return mystring + " - " + message
 
-def record_message(name, message):
+def record_text(name, message):
     '''
     Writes message string to file with specified name
     Parameters
@@ -115,6 +114,39 @@ def record_message(name, message):
         os.mkdir(rec_dir)
     with open(rec_dir+name, 'a+') as my_file:
         my_file.write(message + '\n')
+
+def send_message(send_socket, format_string, msg_number, msg_queue):
+    '''
+    Sends header and message to socket. Header specifies message length, message type and message number
+    Parameters
+    ----------
+    send_socket : Socket that will receive message
+    format_string : Formatted header string
+    msg_number : Message number for header
+    msg_queue : Queue containing message tuple; message type and message
+    Returns
+    -------
+    Integer describing outcome of sending message; 1 sent, 0, nothing to send, -1 exception
+    '''
+    if not msg_queue.empty():
+        full_msg = b""
+        msg_t = msg_queue.get()
+        msg_type = msg_t[0]
+        msg = msg_t[1] 
+        packedmsg = msg_packer(msg_dict, msg_type, msg)
+        msglen = len(packedmsg)
+        packedheader = struct.pack(format_string, msglen, msg_type, msg_number)
+        #msg_number += 1
+        full_msg = packedheader + packedmsg
+        try:
+            print(f"Sending message #{msg_number}")
+            send_socket.send(full_msg)
+            return 1 # Message sent
+        except socket.error as emsg:
+            print(f"SEND socket.error exception: {emsg}")
+            return -1 # Exception
+    else:
+        return 0 # Empty msg_queue
 
 msg_dict = { # Dictionary containing message types and corresponding functions
     1 : msg_type1_pack,
