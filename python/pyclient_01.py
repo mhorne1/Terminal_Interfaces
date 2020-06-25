@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[2]:
 
 
 import socket
@@ -118,9 +118,11 @@ def client_thread(xhost, xport, xheaderformat, xheadersize, xbuffersize, xrecque
                 if msgtype == 1:
                     text_msg = full_msg.decode("utf-8")
                     print(mt.get_timestamp(text_msg))
-                    xrecqueue.put(text_msg)
+                    xrecqueue.put((1,text_msg))
                 elif msgtype == 2:
-                    print(struct.unpack("!4I4d", full_msg[:msglen]))    
+                    msgtuple = struct.unpack("!4I4d", full_msg[:msglen])
+                    print(msgtuple)
+                    xrecqueue.put((2,msgtuple))
                 # Send sequence
                 pyclient.send(b"ACK") # Acknowledgement
                 break
@@ -146,8 +148,13 @@ def record_thread(rec_queue):
     dir_name = mt.get_datetime_name()
     while True:
         if rec_queue.empty() == False:
-            mt.record_text(dir_name, mt.get_timestamp(rec_queue.get()))
-        
+            msg_t = rec_queue.get()
+            msg_type = msg_t[0]
+            msg = msg_t[1]
+            if msg_type == 1:
+                mt.record_text(dir_name, mt.get_timestamp(msg))
+            elif msg_type == 2:
+                mt.record_csv(dir_name, msg)
         if clientevent.is_set(): # Check after recording message
             break
         

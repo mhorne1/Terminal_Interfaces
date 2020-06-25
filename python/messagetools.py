@@ -76,7 +76,8 @@ def get_datetime_name():
     -------
     String
     '''
-    return datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+"_rec.txt"
+    #return datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+"_rec.txt"
+    return datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+"_rec"
 
 def get_timestamp(message):
     '''
@@ -112,8 +113,29 @@ def record_text(name, message):
     rec_dir = 'Records/'
     if not(os.path.isdir(rec_dir)):
         os.mkdir(rec_dir)
-    with open(rec_dir+name, 'a+') as my_file:
+    with open(rec_dir+name+'.txt', 'a+') as my_file:
         my_file.write(message + '\n')
+
+def record_csv(name, message):
+    '''
+    Writes message tuple to file with specified name
+    Parameters
+    ----------
+    name : String
+    message : Data contained in message tuple
+    Returns
+    -------
+    None
+    '''
+    rec_dir = 'Records/'
+    data_list = []
+    if not(os.path.isdir(rec_dir)):
+        os.mkdir(rec_dir)
+    with open(rec_dir+name+'.csv', 'a+') as my_file:
+        for _ in message:
+            data_list.append(str(_))
+        csv_line = ','.join(data_list) + '\n'
+        my_file.write(csv_line)
 
 def send_message(send_socket, format_string, msg_number, msg_queue):
     '''
