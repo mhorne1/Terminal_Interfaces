@@ -9,6 +9,7 @@ import struct
 import threading
 import time
 import queue
+#import crcmod
 
 import messagetools as mt
 
