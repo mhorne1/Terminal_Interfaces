@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2]:
+# In[1]:
 
 
 import socket
@@ -21,19 +21,25 @@ CONN_ATTEMPTS_MAX = 20 # Temporary
 MESSAGES_MAX = 10 # Temporary
 RECV_TIMEOUT = 0.5
 
+recv_q = queue.Queue() # Queue for receiving messages
+send_q = queue.Queue() # Queue for sending messages
 record_q = queue.Queue() # Queue for recording messages
 clientevent = threading.Event()
 
-def client_thread(xhost, xport, xheaderformat, xbuffersize, xrecqueue):
+def client_thread(xhost, xport, xheaderformat, xbuffersize, recvq, sendq,
+                  recordq):
     '''
-    Creates socket, connects to server, and processes messages from server
+    Creates socket, connects to server, and receives and acknowledges
+    messages from server.
     Parameters
     ----------
     xhost : IP address
     xport : Port number
     xheaderformat : String describing header struct, e.g. "!4I4d"
     xbuffersize : Number of bytes allocated to buffer
-    xrecqueue : Queue that can contain new messages to be recorded
+    recvq : Queue containing message tuple that was received
+    sendq : Queue that can contain new messages to be sent
+    recordq : Queue that can contain new messages to be recorded
     Returns
     -------
     None
@@ -45,6 +51,7 @@ def client_thread(xhost, xport, xheaderformat, xbuffersize, xrecqueue):
     conn_setup = False
     conn_attempts = 0
     total_messages = 0
+    client_msgnumber = 1
     
     while conn_attempts < CONN_ATTEMPTS_MAX:
         conn_attempts += 1
@@ -64,15 +71,27 @@ def client_thread(xhost, xport, xheaderformat, xbuffersize, xrecqueue):
     
     while (conn_setup == True) and (total_messages < MESSAGES_MAX):
         # Recv sequence
-        recv_status = mt.recv_message(pyclient, RECV_TIMEOUT, xheaderformat, xbuffersize, xrecqueue)
+        recv_status = mt.recv_message(pyclient, RECV_TIMEOUT,
+                                      xheaderformat, xbuffersize,
+                                      recvq, recordq)
         if recv_status == -1: # Exception
             break
         elif recv_status == -2: # Timeout
             break
         else: # Message received
             total_messages += 1
+        
         # Send sequence
-        pyclient.send(b"ACK") # Acknowledgement
+        #pyclient.send(b"ACK") # Acknowledgement
+        if recvq.empty() == False:
+            #msg_type = xsendqueue.get()
+            msg_t = recvq.get()
+            print(f"Sending ACK: {msg_t}")
+            sendq.put(msg_t)
+            send_status = mt.send_message(pyclient, xheaderformat,
+                                          client_msgnumber, sendq)
+            print(f"send_status: {send_status}")
+            client_msgnumber += 1
     
     if conn_setup == True:
         print("Shutting down pyclient thread!")
@@ -106,7 +125,8 @@ def record_thread(rec_queue):
             break
         time.sleep(0.1)
 
-thr1 = threading.Thread(target=client_thread, args=(HOST, PORT, HEADER_STRING, BUFFER_SIZE, record_q, ))
+thr1 = threading.Thread(target=client_thread, args=(HOST, PORT, HEADER_STRING,
+                        BUFFER_SIZE, recv_q, send_q, record_q))
 thr2 = threading.Thread(target=record_thread, args=(record_q, ))
 thr1.start()
 thr2.start()
@@ -124,6 +144,14 @@ while True:
 
 thr1.join()
 thr2.join()
+
+while not recv_q.empty():
+    recv_q.get()
+print(f"recv_q is empty")
+
+while not send_q.empty():
+    send_q.get()
+print(f"send_q is empty")
 
 while not record_q.empty():
     record_q.get()

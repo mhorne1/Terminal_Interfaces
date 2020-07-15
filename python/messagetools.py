@@ -190,7 +190,7 @@ def send_message(send_socket, header_format, msg_number, msg_queue):
         #msg_number += 1
         full_msg = packedheader + packedmsg
         try:
-            print(f"Sending message #{msg_number}")
+            print(f"Sending message #{msg_number}, msg_type: {msg_type}")
             send_socket.send(full_msg)
             status = 1 # Message sent
         except socket.error as emsg:
@@ -201,7 +201,7 @@ def send_message(send_socket, header_format, msg_number, msg_queue):
         #return 0 # Empty msg_queue
     return status
 
-def recv_message(recv_socket, recv_timeout, header_format, buffer_size, record_queue):
+def recv_message(recv_socket, recv_timeout, header_format, buffer_size, recv_queue, record_queue):
     '''
     Receives packed messages from socket, unpacks them, creates message tuple, and places them in recording queue
     Parameters
@@ -210,10 +210,11 @@ def recv_message(recv_socket, recv_timeout, header_format, buffer_size, record_q
     recv_timeout: Time period that socket will wait to receive messages, in seconds
     header_format : Formatted header string
     buffer_size : Number of bytes that socket will receive
-    record_queue : Queue containing message tuple that will be recorded
+    recv_queue : Queue containing message tuple that was received
+    record_queue :  Queue containing message tuple that will be recorded
     Returns
     -------
-    Integer describing outcome of receiving message; 1 sent, 0, nothing, -1 exception, -2 timeout
+    Integer describing outcome of receiving message; 1 sent, 0, nothing, -1 exception, -2 timeout, -3 closed connection
     '''
     recv_timeout_count = 0
     recv_timeout_max = 10*recv_timeout
@@ -234,7 +235,7 @@ def recv_message(recv_socket, recv_timeout, header_format, buffer_size, record_q
             if recv_timeout_count < recv_timeout_max:
                 continue
             else:
-                print("RECV timeout... Stopping...")
+                print("RECV timeout...")
                 #total_messages = MESSAGES_MAX
                 status = -2 # Timeout
                 break
@@ -245,7 +246,8 @@ def recv_message(recv_socket, recv_timeout, header_format, buffer_size, record_q
             break
 
         if len(msg) == 0:
-            print("Server closed connection... Stopping...")
+            print("Peer closed connection... Stopping...")
+            status = -3 # Closed connection
             break
         elif new_msg:
             recv_timeout_count = 0
@@ -254,7 +256,7 @@ def recv_message(recv_socket, recv_timeout, header_format, buffer_size, record_q
             msglen = msgheaderunpacked[0]
             msgtype = msgheaderunpacked[1]
             msgnumber = msgheaderunpacked[2]
-            print(f"msglen is: {msglen}, msgtype is: {msgtype}, msgnumber is: {msgnumber}")
+            print(f"RECV: msglen is: {msglen}, msgtype is: {msgtype}, msgnumber is: {msgnumber}")
             full_msg = msg[header_size:]
         else:
             full_msg += msg
@@ -264,7 +266,11 @@ def recv_message(recv_socket, recv_timeout, header_format, buffer_size, record_q
         if bytes_read >= msglen:
             msgpack = False # Pack or Unpack message
             unpacked_message = msg_packer(msg_dict, msgtype, msgpack, full_msg[:msglen])
-            print(unpacked_message)
+            print(f"RECV: {unpacked_message}")
+            if msgtype == 3:
+                recv_queue.put(unpacked_message)
+            else:
+                recv_queue.put((3,(msgtype,0,0,0)))
             record_queue.put((msgtype,unpacked_message))
             status = 1
             break
@@ -273,4 +279,5 @@ def recv_message(recv_socket, recv_timeout, header_format, buffer_size, record_q
 msg_dict = { # Dictionary containing message types and corresponding functions
     1 : msg_type1_pack,
     2 : msg_type2_pack,
+    3 : msg_type3_pack,
 }
