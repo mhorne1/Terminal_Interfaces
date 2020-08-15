@@ -1,8 +1,30 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[2]:
 
+
+# Simple TCP Client that can be used interact with the UUT running the
+# Server. Once connected, the UUT sends telemetry messages to the Client at
+# regular intervals.
+
+# Messages are comprised of both a header and a body. The header itself is
+# always ten bytes. It specifies the number of bytes in the body, the type of
+# message that the body pertains to, and an incremental message number.
+# Currently, the message body can be either text data, numerical data, or
+# acknowledgement data.
+# In the future, a message footer is planned in which there will be an
+# application layer checksum for authenticating the message.
+
+# Currently, the Client can send acknowledgement messages to the Server.
+# In the future, the Server will also be able to receive command messages
+# from the Client, and the Server will respond to the command.
+
+# The Client socket is run in an additional thread. Another thread is used to
+# record telemetry messages sent from the UUT. Queues are used to share
+# message data between threads.
+
+# For simplicity's sake, blocking socket reads and timeouts are used.
 
 import socket
 import struct
@@ -90,7 +112,7 @@ def client_thread(xhost, xport, xheaderformat, xbuffersize, recvq, sendq,
             sendq.put(msg_t)
             send_status = mt.send_message(pyclient, xheaderformat,
                                           client_msgnumber, sendq)
-            print(f"send_status: {send_status}")
+            #print(f"send_status: {send_status}")
             client_msgnumber += 1
     
     if conn_setup == True:
@@ -145,6 +167,7 @@ while True:
 thr1.join()
 thr2.join()
 
+# Empty each queue
 while not recv_q.empty():
     recv_q.get()
 print(f"recv_q is empty")

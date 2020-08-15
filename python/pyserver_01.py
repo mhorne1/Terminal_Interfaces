@@ -1,8 +1,32 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[3]:
 
+
+# Simple TCP Server that can be used to mimic the UUT where telemetry
+# messages are sent to the Client connection at regular intervals.
+
+# Messages are comprised of both a header and a body. The header itself is
+# always ten bytes. It specifies the number of bytes in the body, the type of
+# message that the body pertains to, and an incremental message number.
+# Currently, the message body can be either text data, numerical data, or
+# acknowledgement data.
+# In the future, a message footer is planned in which there will be an
+# application layer checksum for authenticating the message.
+
+# Currently, the Server can receive acknowledgement messages from the Client.
+# In the future, the Server will also be able to receive command messages
+# from the Client, and the Server will respond to the command.
+
+# The Server socket is run in an additional thread. Another thread is used to
+# capture the keyboard input for specifying a custom text message. Queues
+# are used to share message data between threads.
+
+# For simplicity's sake, blocking socket reads and timeouts are used.
+
+# In the future, the Server will be able to record its activities and its
+# interaction with the Client.
 
 import socket
 import struct
@@ -23,8 +47,9 @@ SEND_COUNT_MAX = 5 # Temporary
 recv_q = queue.Queue() # Queue for receiving messages
 send_q = queue.Queue() # Queue for sending messages
 record_q = queue.Queue() # Queue for recording messages
-serverevent = threading.Event()
+serverevent = threading.Event() # Event to gracefully stop threads
 
+# Specify a default text message for transmission
 #msg = "Server Message: 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!\"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~ \t\n\r\x0b\x0c"
 msg = "Server Message: 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 msg_type = 1 # String message
@@ -32,7 +57,8 @@ msg_t = (msg_type, msg) # Message tuple : (message_type, message)
 
 def server_thread(xhost, xport, xheaderformat, recvq, sendq, recordq):
     '''
-    Creates socket, waits for connection by client, receives and sends messages to clients
+    Creates socket, waits for connection by client, receives and sends
+    messages to clients
     Parameters
     ----------
     xhost : IP address
@@ -97,7 +123,8 @@ def server_thread(xhost, xport, xheaderformat, recvq, sendq, recordq):
                         break
                     
                     # Send sequence
-                    send_status = mt.send_message(clientsocket, xheaderformat, xmsgnumber, sendq)
+                    send_status = mt.send_message(clientsocket, xheaderformat,
+                                                  xmsgnumber, sendq)
                     if send_status == -1: # Exception
                         break
                     elif send_status == 1: # Message sent
@@ -122,7 +149,8 @@ def input_thread(message_queue):
     '''
     mt.get_message(message_queue)
 
-thr1 = threading.Thread(target=server_thread, args=(HOST, PORT, HEADER_FORMAT, recv_q, send_q, record_q))
+thr1 = threading.Thread(target=server_thread, args=(HOST, PORT, HEADER_FORMAT,
+                                                    recv_q, send_q, record_q))
 thr2 = threading.Thread(target=input_thread, args=(send_q, ))
 thr1.start()
 thr2.start()
@@ -138,8 +166,10 @@ while True:
             time.sleep(4)
             if msg_count < 5:
                 msg_count += 1
-                #send_q.put(msg_t)
-                send_q.put((2,(10, 20, 30, 40, 50.12, 60.34, 70.56, 80.78)))
+                # Send default text message
+                send_q.put(msg_t)
+                # Send default numerical message
+                #send_q.put((2,(10, 20, 30, 40, 50.12, 60.34, 70.56, 80.78)))
     except KeyboardInterrupt:
         serverevent.set()
         break
@@ -147,6 +177,7 @@ while True:
 thr1.join()
 thr2.join()
 
+# Empty each queue
 while not recv_q.empty():
     recv_q.get()
 print(f"recv_q is empty")

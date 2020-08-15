@@ -276,7 +276,7 @@ def recv_message(recv_socket, recv_timeout, header_format, buffer_size, recv_que
             break
     return status
 
-msg_dict = { # Dictionary containing message types and corresponding functions
+msg_dict = { # Dispatch table containing message types and corresponding functions
     1 : msg_type1_pack,
     2 : msg_type2_pack,
     3 : msg_type3_pack,
