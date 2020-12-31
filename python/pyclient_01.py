@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2]:
+# In[1]:
 
 
-# Simple TCP Client that can be used interact with the UUT running the
+# Simple TCP/IP Client that can be used interact with the UUT running the
 # Server. Once connected, the UUT sends telemetry messages to the Client at
 # regular intervals.
 

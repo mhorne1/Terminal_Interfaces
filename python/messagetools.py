@@ -19,13 +19,23 @@ def get_message(myqueue):
     myqueue : Queue that can receive new messages
     Returns
     -------
-    None
+    status : False in order to quit
     '''
-    time.sleep(0.25) # Slight delay to avoid overlapping printing from from other threads
-    new_msg = input("Please enter a new message...")
-    print(f"Adding message '{new_msg}' to queue!")
-    myqueue.put((1,new_msg))
-
+    status = True
+    #time.sleep(0.25) # Slight delay to avoid overlapping printing from from other threads
+    #new_msg = input("Please enter a new message...")
+    new_msg = input()
+    #print(f"Adding message '{new_msg}' to queue!")
+    #print(new_msg[0])
+    if new_msg[0].isnumeric():
+        if int(new_msg[0]) == 1:
+            print(f"Adding message '{new_msg[2:]}' to queue!")
+            myqueue.put((1,new_msg[2:]))
+            status = True
+    elif new_msg[0] == 'Q' or new_msg[0] == 'q':
+        status = False
+    return status
+    
 def msg_packer(message_dict, message_type, message_pack, *message_args):
     '''
     Uses message_type to determine how message is packed

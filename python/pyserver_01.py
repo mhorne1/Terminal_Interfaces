@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[3]:
+# In[1]:
 
 
-# Simple TCP Server that can be used to mimic the UUT where telemetry
+# Simple TCP/IP Server that can be used to mimic the UUT where telemetry
 # messages are sent to the Client connection at regular intervals.
 
 # Messages are comprised of both a header and a body. The header itself is
@@ -147,7 +147,13 @@ def input_thread(message_queue):
     -------
     None
     '''
-    mt.get_message(message_queue)
+    status = True
+    print("Please enter a new message or Q to quit")
+    while True:
+        status = mt.get_message(message_queue)
+        if status == False:
+            print("Quitting input_thread...")
+            break
 
 thr1 = threading.Thread(target=server_thread, args=(HOST, PORT, HEADER_FORMAT,
                                                     recv_q, send_q, record_q))
@@ -164,7 +170,7 @@ while True:
             break
         else:
             time.sleep(4)
-            if msg_count < 5:
+            if msg_count < 10:
                 msg_count += 1
                 # Send default text message
                 send_q.put(msg_t)
