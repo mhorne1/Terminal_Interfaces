@@ -26,7 +26,6 @@ def get_message(myqueue):
     #new_msg = input("Please enter a new message...")
     new_msg = input()
     #print(f"Adding message '{new_msg}' to queue!")
-    #print(new_msg[0])
     if new_msg[0].isnumeric():
         if int(new_msg[0]) == 1:
             print(f"Adding message '{new_msg[2:]}' to queue!")

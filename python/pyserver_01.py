@@ -38,7 +38,7 @@ import queue
 import messagetools as mt
 
 HOST = socket.gethostname()
-PORT = 5678
+PORT = 5001 # iPerf
 HEADER_SIZE = 10
 HEADER_FORMAT = "!IHI"
 CONN_COUNT_MAX = 1 # Temporary
@@ -139,7 +139,9 @@ def server_thread(xhost, xport, xheaderformat, recvq, sendq, recordq):
 
 def input_thread(message_queue):
     '''
-    Prompts user to enter new messages that will be addeded to message queue
+    Prompts user to enter new messages
+    Enter Q in order to quit program
+    New messages can be addeded to message queue
     Parameters
     ----------
     message_queue : Queue that can contain new messages to be sent
@@ -153,6 +155,8 @@ def input_thread(message_queue):
         status = mt.get_message(message_queue)
         if status == False:
             print("Quitting input_thread...")
+            if not serverevent.is_set():
+                serverevent.set()
             break
 
 thr1 = threading.Thread(target=server_thread, args=(HOST, PORT, HEADER_FORMAT,
@@ -169,8 +173,8 @@ while True:
             print("Pyserver event is set!")
             break
         else:
-            time.sleep(4)
-            if msg_count < 10:
+            time.sleep(5)
+            if msg_count < 5:
                 msg_count += 1
                 # Send default text message
                 send_q.put(msg_t)

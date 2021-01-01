@@ -36,11 +36,11 @@ import queue
 import messagetools as mt
 
 HOST = socket.gethostname()
-PORT = 5678
+PORT = 5001 # iPerf
 HEADER_STRING = "!IHI"
 BUFFER_SIZE = 32
 CONN_ATTEMPTS_MAX = 20 # Temporary
-MESSAGES_MAX = 10 # Temporary
+MESSAGES_MAX = 20 # Temporary
 RECV_TIMEOUT = 0.5
 
 recv_q = queue.Queue() # Queue for receiving messages
@@ -98,8 +98,11 @@ def client_thread(xhost, xport, xheaderformat, xbuffersize, recvq, sendq,
                                       recvq, recordq)
         if recv_status == -1: # Exception
             break
-        elif recv_status == -2: # Timeout
+        elif clientevent.is_set():
             break
+        elif recv_status == -2: # Timeout
+            #break
+            continue
         else: # Message received
             total_messages += 1
         
@@ -147,11 +150,35 @@ def record_thread(rec_queue):
             break
         time.sleep(0.1)
 
+def input_thread(message_queue):
+    '''
+    Prompts user to enter new messages
+    Enter Q in order to quit program
+    New messages can be addeded to message queue
+    Parameters
+    ----------
+    message_queue : Queue that can contain new messages to be sent
+    Returns
+    -------
+    None
+    '''
+    status = True
+    print("Please enter a new message or Q to quit")
+    while True:
+        status = mt.get_message(message_queue)
+        if status == False:
+            print("Quitting input_thread...")
+            if not clientevent.is_set():
+                clientevent.set()
+            break
+            
 thr1 = threading.Thread(target=client_thread, args=(HOST, PORT, HEADER_STRING,
                         BUFFER_SIZE, recv_q, send_q, record_q))
-thr2 = threading.Thread(target=record_thread, args=(record_q, ))
+thr2 = threading.Thread(target=input_thread, args=(send_q, ))
+thr3 = threading.Thread(target=record_thread, args=(record_q, ))
 thr1.start()
 thr2.start()
+thr3.start()
 
 # Main Thread
 while True:
@@ -166,6 +193,7 @@ while True:
 
 thr1.join()
 thr2.join()
+thr3.join()
 
 # Empty each queue
 while not recv_q.empty():
