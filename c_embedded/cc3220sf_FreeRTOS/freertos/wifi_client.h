@@ -5,6 +5,8 @@
 #define PORT                        SERVER_PORT
 #define FRAME_LENGTH                SERVER_FRAME_LENGTH
 
+#define DEFAULT_MESSAGE             "Message from CC3220SF"
+
 #define NUM_OF_PKT                  (1)
 #define ALWAYS_OPEN_SOCK            (-1)
 #define OPEN_SOCK_ONCE              (-2)
@@ -69,10 +71,20 @@ typedef struct _PowerMeasure_ControlBlock_t_
     SlSockAddrIn_t  ipV4Addr;
 }PowerMeasure_ControlBlock;
 
+/* Control block definition */
+typedef struct _ClientMsg_ControlBlock_t_
+{
+    uint32_t        msg_len;        // Number of bytes in the message body
+    uint16_t        msg_type;       // Type of message that the body contains
+    uint32_t        msg_number;     // Incremental message number
+    signed char     message[FRAME_LENGTH];
+}ClientMsg_ControlBlock;
+
 //****************************************************************************
 //                          FUNCTION PROTOTYPES
 //****************************************************************************
 void prepareDataFrame(uint16_t port,uint32_t ipAddr);
 int32_t bsdTcpClient(uint16_t port, int16_t sid);
+int32_t bsdNewTcpClient(uint16_t port, int16_t sid);
 
 #endif /* WIFI_CLIENT_H_ */

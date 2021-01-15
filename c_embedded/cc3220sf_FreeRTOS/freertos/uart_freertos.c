@@ -250,6 +250,10 @@ void simpleConsole(UART_Handle uart)
                 qMsgSend.header = WIFI_tcli;
                 xQueueSendToBack( xQueue1, &qMsgSend, 0 );
                 break;
+            case 'A': // Display and then send TCP Client message
+                qMsgSend.header = WIFI_cmsg;
+                xQueueSendToBack( xQueue1, &qMsgSend, 0 );
+                break;
             case 'm': // Check memory heap allocation
                 UART_printf("configTOTAL_HEAP_SIZE: %d\r\n",
                             (unsigned int)configTOTAL_HEAP_SIZE);

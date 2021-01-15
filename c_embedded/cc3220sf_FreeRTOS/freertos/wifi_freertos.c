@@ -97,7 +97,18 @@ PowerMeasure_AppData    PowerMeasure_appData = {
 /* Struct containing server address info and send buffer */
 PowerMeasure_ControlBlock   PowerMeasure_CB;
 
+/* Struct containing socket configuration for TCP Client */
+ClientMsg_ControlBlock    ClientMsg_appData = {
+    .msg_len = FRAME_LENGTH,            /* 80 bytes for text */
+    .msg_type = 1,                      /* 1 for text  */
+    .msg_number = 0,                    /* Beginning number */
+    .message = DEFAULT_MESSAGE,         /* Client message */
+};
+
 /* Semaphores should be created to protect these global variables */
+
+/* New client message number */
+volatile uint32_t g_message_number = 0;
 
 /* Pointer to send buffer used by TCP Client */
 signed char *g_pClientSendBuffer = PowerMeasure_CB.frameData;
@@ -387,6 +398,22 @@ int wifiManager(unsigned int cmd)
                 UART_printf("TCP Client sent message to server [sockID=%d]\n\r",
                             PowerMeasure_appData.sockID);
             }
+            break;
+        case WIFI_cmsg: // Test sending new client message
+            UART_printf("Sending new client message\n\r");
+            send_status = -1;
+            g_message_number += 1; // Increment client message number
+
+            prepareDataFrame(PowerMeasure_appData.port,
+                             PowerMeasure_appData.ipAddr);
+
+            ClientMsg_appData.msg_len = sl_Htonl(FRAME_LENGTH);         // Set message size
+            ClientMsg_appData.msg_type = sl_Htons(1);                   // Set message type
+            //ClientMsg_appData.msg_number = sl_Htonl(g_message_number);  // Set message number
+            ClientMsg_appData.msg_number = g_message_number;  // Set message number
+
+            send_status = bsdNewTcpClient(PowerMeasure_appData.port,
+                                          PowerMeasure_appData.sockID);
             break;
         case WIFI_csid: // Close TCP Client socket ID
             if (PowerMeasure_appData.sockID != OPEN_SOCK_ONCE) {
@@ -769,7 +796,74 @@ int32_t bsdTcpClient(uint16_t port, int16_t sid)
 
     while (idx < NUM_OF_PKT)
     {
-        status = sl_Send(sockId,PowerMeasure_CB.frameData ,FRAME_LENGTH, 0 );
+        status = sl_Send(sockId,
+                         PowerMeasure_CB.frameData,
+                         FRAME_LENGTH,
+                         0 );
+        /* Success: status = number of bytes sent */
+        /* Fail: status = -1 */
+        //UART_printf("status of sl_Send = %d\n\r", status);
+        if (status <= 0 ) {
+            status = sl_Close(sockId);
+            /* Success: status = 0 */
+            /* Fail: status = -1 */
+            //UART_printf("status of sl_Close = %d\n\r", status);
+        }
+        idx++;
+    }
+    if (sid == ALWAYS_OPEN_SOCK) {
+        /* Next time, use a new socket */
+        status = sl_Close(sockId);
+    }
+    else {
+        /* store the current open socket id*/
+        PowerMeasure_appData.sockID = sockId;
+    }
+    //return(0);
+    return(status);
+}
+
+//*****************************************************************************
+//
+//! \brief This function implements the modified TCP client .
+//!
+//! \param Port - socket port number; Sid - socket id,
+//!        -ve if socket is already opened.
+//!
+//! \return 0 on success, -ve otherwise.
+//
+//*****************************************************************************
+int32_t bsdNewTcpClient(uint16_t port, int16_t sid)
+{
+    int16_t         sockId;
+    int16_t         idx = 0;
+    int16_t         status = -1;
+
+    if (sid < 0) {
+        /* Need to open socket  */
+        sockId = sl_Socket(SL_AF_INET,SL_SOCK_STREAM, 0);
+        /* Make connection establishment */
+        status = sl_Connect(sockId,
+                            ( SlSockAddr_t *)&PowerMeasure_CB.ipV4Addr,
+                            sizeof(SlSockAddrIn_t));
+        /* Success: status = 0 */
+        /* Fail: status = -1 */
+        //UART_printf("status of sl_Connect = %d\n\r", status);
+        if (status < 0) {
+            sl_Close(sockId);
+        }
+    }
+    else {
+        /* Socket is already opened */
+        sockId = sid;
+    }
+
+    while (idx < NUM_OF_PKT)
+    {
+        status = sl_Send(sockId,
+                         &ClientMsg_appData,
+                         sizeof(ClientMsg_ControlBlock),
+                         0);
         /* Success: status = number of bytes sent */
         /* Fail: status = -1 */
         //UART_printf("status of sl_Send = %d\n\r", status);
