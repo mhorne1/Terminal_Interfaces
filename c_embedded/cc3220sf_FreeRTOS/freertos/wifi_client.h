@@ -72,13 +72,32 @@ typedef struct _PowerMeasure_ControlBlock_t_
 }PowerMeasure_ControlBlock;
 
 /* Control block definition */
+typedef struct _ClientHeader_ControlBlock_t_
+{
+    /* Number of bytes in the message body */
+    uint32_t        msg_len;
+    /* Type of message that the body contains, no padding */
+    uint32_t        msg_type;
+    /* Incremental message number */
+    uint32_t        msg_number;
+}ClientHeader_ControlBlock;
+
+/* Control block definition */
+typedef struct _ClientBody_ControlBlock_t_
+{
+    /* Text message (Type 1) */
+    signed char     message[FRAME_LENGTH];
+}ClientBody_ControlBlock;
+
+/* Control block definition */
 typedef struct _ClientMsg_ControlBlock_t_
 {
-    uint32_t        msg_len;        // Number of bytes in the message body
-    uint16_t        msg_type;       // Type of message that the body contains
-    uint32_t        msg_number;     // Incremental message number
-    signed char     message[FRAME_LENGTH];
+    /* Standardized message header */
+    ClientHeader_ControlBlock       header;
+    /* Message body */
+    ClientBody_ControlBlock         body;
 }ClientMsg_ControlBlock;
+
 
 //****************************************************************************
 //                          FUNCTION PROTOTYPES

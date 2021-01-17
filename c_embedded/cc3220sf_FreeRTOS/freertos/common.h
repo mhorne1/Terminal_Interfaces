@@ -9,11 +9,19 @@
 #define PROJECT_QUEUE_LENGTH    (3)
 #define PROJECT_BF_FLAGS        (0)
 
+typedef enum
+{
+    TPRI_uart = 1,              // Uart task priority
+    TPRI_i2c,                   // I2C task priority
+    TPRI_wifi,                  // Wifi task priority
+    TPRI_final,                 // Final task priority
+}TaskPriorityUseCases;
+
 typedef struct _Task_Handles_t_
 {
-    TaskHandle_t uartHandle;
-    TaskHandle_t i2cHandle;
-    TaskHandle_t wifiHandle;
+    TaskHandle_t uartHandle;    // Uart task handle
+    TaskHandle_t i2cHandle;     // I2C task handle
+    TaskHandle_t wifiHandle;    // Wifi task handle
 }Task_Handles_Block;
 
 typedef struct _Q_Data_t_

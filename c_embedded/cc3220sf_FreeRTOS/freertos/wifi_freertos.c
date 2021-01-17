@@ -98,11 +98,20 @@ PowerMeasure_AppData    PowerMeasure_appData = {
 PowerMeasure_ControlBlock   PowerMeasure_CB;
 
 /* Struct containing socket configuration for TCP Client */
+/*
 ClientMsg_ControlBlock    ClientMsg_appData = {
-    .msg_len = FRAME_LENGTH,            /* 80 bytes for text */
-    .msg_type = 1,                      /* 1 for text  */
-    .msg_number = 0,                    /* Beginning number */
-    .message = DEFAULT_MESSAGE,         /* Client message */
+    .msg_len = FRAME_LENGTH,            // 80 bytes for text
+    .msg_type = 1,                      // 1 for text
+    .msg_number = 1,                    // Beginning number
+    .message = DEFAULT_MESSAGE,         // Client message
+};
+*/
+
+ClientMsg_ControlBlock    ClientMsg_appData = {
+    .header.msg_len = FRAME_LENGTH,     // 80 bytes for text
+    .header.msg_type = 1,               // 1 for text
+    .header.msg_number = 0,             // Beginning number
+    .body.message = DEFAULT_MESSAGE,    // Client message
 };
 
 /* Semaphores should be created to protect these global variables */
@@ -407,11 +416,14 @@ int wifiManager(unsigned int cmd)
             prepareDataFrame(PowerMeasure_appData.port,
                              PowerMeasure_appData.ipAddr);
 
-            ClientMsg_appData.msg_len = sl_Htonl(FRAME_LENGTH);         // Set message size
-            ClientMsg_appData.msg_type = sl_Htons(1);                   // Set message type
-            //ClientMsg_appData.msg_number = sl_Htonl(g_message_number);  // Set message number
-            ClientMsg_appData.msg_number = g_message_number;  // Set message number
+            /* Convert message size from host byte order to network byte order */
+            ClientMsg_appData.header.msg_len = sl_Htonl(FRAME_LENGTH);
+            /* Convert message type from host byte order to network byte order */
+            ClientMsg_appData.header.msg_type = sl_Htonl(1);
+            /* Convert message number from host byte order to network byte order */
+            ClientMsg_appData.header.msg_number = sl_Htonl(g_message_number);
 
+            /* Send new client message */
             send_status = bsdNewTcpClient(PowerMeasure_appData.port,
                                           PowerMeasure_appData.sockID);
             break;
