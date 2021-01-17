@@ -9,7 +9,7 @@
 # regular intervals.
 
 # Messages are comprised of both a header and a body. The header itself is
-# always ten bytes. It specifies the number of bytes in the body, the type of
+# always 12 bytes. It specifies the number of bytes in the body, the type of
 # message that the body pertains to, and an incremental message number.
 # Currently, the message body can be either text data, numerical data, or
 # acknowledgement data.
@@ -37,7 +37,7 @@ import messagetools as mt
 
 HOST = socket.gethostname()
 PORT = 5001 # iPerf
-HEADER_STRING = "!IHI"
+HEADER_STRING = "!III" # No padding like with "!IHI"
 BUFFER_SIZE = 32
 CONN_ATTEMPTS_MAX = 20 # Temporary
 MESSAGES_MAX = 20 # Temporary

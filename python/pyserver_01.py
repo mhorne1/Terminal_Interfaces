@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[12]:
 
 
 # Simple TCP/IP Server that can be used to mimic the UUT where telemetry
 # messages are sent to the Client connection at regular intervals.
 
 # Messages are comprised of both a header and a body. The header itself is
-# always ten bytes. It specifies the number of bytes in the body, the type of
+# always 12 bytes. It specifies the number of bytes in the body, the type of
 # message that the body pertains to, and an incremental message number.
 # Currently, the message body can be either text data, numerical data, or
 # acknowledgement data.
@@ -39,8 +39,8 @@ import messagetools as mt
 
 HOST = socket.gethostname()
 PORT = 5001 # iPerf
-HEADER_SIZE = 10
-HEADER_FORMAT = "!IHI"
+HEADER_SIZE = 12
+HEADER_FORMAT = "!III" # No padding like with "!IHI"
 CONN_COUNT_MAX = 1 # Temporary
 SEND_COUNT_MAX = 5 # Temporary
 
@@ -177,7 +177,8 @@ while True:
             if msg_count < 5:
                 msg_count += 1
                 # Send default text message
-                send_q.put(msg_t)
+                # send_q.put(msg_t)
+                
                 # Send default numerical message
                 #send_q.put((2,(10, 20, 30, 40, 50.12, 60.34, 70.56, 80.78)))
     except KeyboardInterrupt:
