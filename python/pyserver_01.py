@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[12]:
+# In[3]:
 
 
+# "pyserver_01.py <port>"
+#
 # Simple TCP/IP Server that can be used to mimic the UUT where telemetry
 # messages are sent to the Client connection at regular intervals.
 
@@ -28,6 +30,7 @@
 # In the future, the Server will be able to record its activities and its
 # interaction with the Client.
 
+import sys
 import socket
 import struct
 import threading
@@ -37,8 +40,16 @@ import queue
 
 import messagetools as mt
 
+ARGV = sys.argv[1:]
+ARGC = len(ARGV)
+#print(f"arg0={ARGV[0]}")
+print(type(ARGV[0]))
 HOST = socket.gethostname()
 PORT = 5001 # iPerf
+if ((ARGC >= 1) and (ARGV[0] != '-f')):
+    if ((ARGC >= 1) and (isinstance(ARGV[0], str))):
+        PORT = int(ARGV[0])
+print(f"host={HOST} port={PORT}")
 HEADER_SIZE = 12
 HEADER_FORMAT = "!III" # No padding like with "!IHI"
 CONN_COUNT_MAX = 1 # Temporary
@@ -50,8 +61,9 @@ record_q = queue.Queue() # Queue for recording messages
 serverevent = threading.Event() # Event to gracefully stop threads
 
 # Specify a default text message for transmission
-#msg = "Server Message: 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!\"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~ \t\n\r\x0b\x0c"
-msg = "Server Message: 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+#msg = "Server Message: 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLM" + \
+#      "NOPQRSTUVWXYZ!\"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~ \t\n\r\x0b\x0c"
+msg = "Server Message: 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLM" +       "NOPQRSTUVWXYZ"
 msg_type = 1 # String message
 msg_t = (msg_type, msg) # Message tuple : (message_type, message)
 
@@ -177,7 +189,7 @@ while True:
             if msg_count < 5:
                 msg_count += 1
                 # Send default text message
-                # send_q.put(msg_t)
+                #send_q.put(msg_t)
                 
                 # Send default numerical message
                 #send_q.put((2,(10, 20, 30, 40, 50.12, 60.34, 70.56, 80.78)))

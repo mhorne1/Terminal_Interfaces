@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[11]:
 
 
+# "pyclient_01.py <IPv4 or IPv6 addr> <port>"
+#
 # Simple TCP/IP Client that can be used interact with the UUT running the
 # Server. Once connected, the UUT sends telemetry messages to the Client at
 # regular intervals.
@@ -26,6 +28,7 @@
 
 # For simplicity's sake, blocking socket reads and timeouts are used.
 
+import sys
 import socket
 import struct
 import threading
@@ -35,8 +38,17 @@ import queue
 
 import messagetools as mt
 
-HOST = socket.gethostname()
-PORT = 5001 # iPerf
+ARGV = sys.argv[1:]
+ARGC = len(ARGV)
+#print(f"arg0={ARGV[0]} arg1={ARGV[1]}")
+HOST = socket.gethostname() # Default IP Address
+PORT = 5001 # Default Port, iPerf
+if ((ARGC >= 1) and (ARGV[0] != '-f')):
+    if ((ARGC >= 1) and (isinstance(ARGV[0], str))):
+        HOST = ARGV[0]
+    if ((ARGC >= 2 and isinstance(ARGV[1], str))):
+        PORT = int(ARGV[1])
+print(f"host={HOST} port={PORT}")
 HEADER_STRING = "!III" # No padding like with "!IHI"
 BUFFER_SIZE = 32
 CONN_ATTEMPTS_MAX = 20 # Temporary
