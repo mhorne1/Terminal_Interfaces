@@ -74,12 +74,12 @@ def msg_type2_pack(pack_message, message):
     Parameters
     ----------
     pack_message : True or False
-    message : Tuple (4 uint32, 4 double), or byte encoded tuple
+    message : Tuple (4 uint32, 4 float), or byte encoded tuple
     Returns
     -------
     Network (big-endian) byte encoded tuple, or tuple
     '''
-    STRUCT_FORMAT = "!4I4d"
+    STRUCT_FORMAT = "!4I4f"
     if pack_message == True:
         return struct.pack(STRUCT_FORMAT, *message)
     else:
