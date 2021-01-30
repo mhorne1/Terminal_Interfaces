@@ -48,6 +48,14 @@ typedef enum
     WIFI_cfg_wpa3,      // Select SL_WLAN_SEC_TYPE_WPA3
 }WIFIConfigUseCases;
 
+typedef enum
+{
+    WIFI_msg_type1 = 1,     // Text
+    WIFI_msg_type2,         // Numeric
+    WIFI_msg_type3,         // Acknowledge
+    WIFI_msg_last,          // Unused
+}WIFIMessageTypes;
+
 extern signed char *g_pClientSendBuffer;
 extern bool g_clientSendFlag;
 extern bool g_wifiConnectFlag;

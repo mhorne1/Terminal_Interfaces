@@ -99,11 +99,36 @@ typedef struct _ClientMsg_ControlBlock_t_
 }ClientMsg_ControlBlock;
 
 
+/* Type 2 message body control block definition */
+typedef struct _T2Msg_ControlBlock_t_
+{
+    /* Numeric message (Type 2) */
+    uint32_t        var_a;
+    uint32_t        var_b;
+    uint32_t        var_c;
+    uint32_t        var_d;
+    float           var_e;
+    float           var_f;
+    float           var_g;
+    float           var_h;
+}T2Msg_ControlBlock;
+
+/* Full Type 2 message control block definition */
+typedef struct _ClientT2Msg_ControlBlock_t_
+{
+    /* Standardized message header */
+    ClientHeader_ControlBlock       header;
+    /* Message body */
+    T2Msg_ControlBlock              body;
+}ClientT2Msg_ControlBlock;
+
+
+
 //****************************************************************************
 //                          FUNCTION PROTOTYPES
 //****************************************************************************
 void prepareDataFrame(uint16_t port,uint32_t ipAddr);
 int32_t bsdTcpClient(uint16_t port, int16_t sid);
-int32_t bsdNewTcpClient(uint16_t port, int16_t sid);
+int32_t bsdCustomTcpClient(uint16_t port, int16_t sid, int16_t msg_type);
 
 #endif /* WIFI_CLIENT_H_ */

@@ -98,20 +98,26 @@ PowerMeasure_AppData    PowerMeasure_appData = {
 PowerMeasure_ControlBlock   PowerMeasure_CB;
 
 /* Struct containing socket configuration for TCP Client */
-/*
-ClientMsg_ControlBlock    ClientMsg_appData = {
-    .msg_len = FRAME_LENGTH,            // 80 bytes for text
-    .msg_type = 1,                      // 1 for text
-    .msg_number = 1,                    // Beginning number
-    .message = DEFAULT_MESSAGE,         // Client message
-};
-*/
-
 ClientMsg_ControlBlock    ClientMsg_appData = {
     .header.msg_len = FRAME_LENGTH,     // 80 bytes for text
-    .header.msg_type = 1,               // 1 for text
+    .header.msg_type = WIFI_msg_type1,  // 1 for text
     .header.msg_number = 0,             // Beginning number
     .body.message = DEFAULT_MESSAGE,    // Client message
+};
+
+/* Struct containing socket configuration for TCP Client */
+ClientT2Msg_ControlBlock    T2Msg_appData = {
+    .header.msg_len = sizeof(T2Msg_ControlBlock),   // 80 bytes for text
+    .header.msg_type = WIFI_msg_type2,  // 2 for numeric
+    .header.msg_number = 0,             // Beginning number
+    .body.var_a = 10,                   // uint32_t
+    .body.var_b = 20,                   // uint32_t
+    .body.var_c = 30,                   // uint32_t
+    .body.var_d = 40,                   // uint32_t
+    .body.var_e = 50.1,                 // float
+    .body.var_f = 60.2,                 // float
+    .body.var_g = 70.3,                 // float
+    .body.var_h = 80.4,                 // float
 };
 
 /* Semaphores should be created to protect these global variables */
@@ -142,6 +148,7 @@ int32_t g_wifiMode;
 //****************************************************************************
 void wifiTask(void *pvParameters);
 int wifiManager( unsigned int cmd );
+float fl_htonl(float value);
 
 //****************************************************************************
 //                          EXTERNAL FUNCTIONS
@@ -416,16 +423,35 @@ int wifiManager(unsigned int cmd)
             prepareDataFrame(PowerMeasure_appData.port,
                              PowerMeasure_appData.ipAddr);
 
-            /* Convert message size from host byte order to network byte order */
-            ClientMsg_appData.header.msg_len = sl_Htonl(FRAME_LENGTH);
-            /* Convert message type from host byte order to network byte order */
-            ClientMsg_appData.header.msg_type = sl_Htonl(1);
-            /* Convert message number from host byte order to network byte order */
-            ClientMsg_appData.header.msg_number = sl_Htonl(g_message_number);
+            if (qMsgRecv.param == WIFI_msg_type1) {
+                /* Convert message size from host byte order to network byte order */
+                ClientMsg_appData.header.msg_len = sl_Htonl(FRAME_LENGTH);
+                /* Convert message type from host byte order to network byte order */
+                ClientMsg_appData.header.msg_type = sl_Htonl(WIFI_msg_type1);
+                /* Convert message number from host byte order to network byte order */
+                ClientMsg_appData.header.msg_number = sl_Htonl(g_message_number);
+            } else if (qMsgRecv.param == WIFI_msg_type2) {
+                /* Convert message size from host byte order to network byte order */
+                T2Msg_appData.header.msg_len = sl_Htonl(sizeof(T2Msg_ControlBlock));
+                /* Convert message type from host byte order to network byte order */
+                T2Msg_appData.header.msg_type = sl_Htonl(WIFI_msg_type2);
+                /* Convert message number from host byte order to network byte order */
+                T2Msg_appData.header.msg_number = sl_Htonl(g_message_number);
+
+                T2Msg_appData.body.var_a = sl_Htonl(10);
+                T2Msg_appData.body.var_b = sl_Htonl(20);
+                T2Msg_appData.body.var_c = sl_Htonl(30);
+                T2Msg_appData.body.var_d = sl_Htonl(40);
+                T2Msg_appData.body.var_e = fl_htonl(50.1);
+                T2Msg_appData.body.var_f = fl_htonl(60.2);
+                T2Msg_appData.body.var_g = fl_htonl(70.3);
+                T2Msg_appData.body.var_h = fl_htonl(80.4);
+            }
 
             /* Send new client message */
-            send_status = bsdNewTcpClient(PowerMeasure_appData.port,
-                                          PowerMeasure_appData.sockID);
+            send_status = bsdCustomTcpClient(PowerMeasure_appData.port,
+                                             PowerMeasure_appData.sockID,
+                                             qMsgRecv.param);
             break;
         case WIFI_csid: // Close TCP Client socket ID
             if (PowerMeasure_appData.sockID != OPEN_SOCK_ONCE) {
@@ -845,7 +871,7 @@ int32_t bsdTcpClient(uint16_t port, int16_t sid)
 //! \return 0 on success, -ve otherwise.
 //
 //*****************************************************************************
-int32_t bsdNewTcpClient(uint16_t port, int16_t sid)
+int32_t bsdCustomTcpClient(uint16_t port, int16_t sid, int16_t msg_type)
 {
     int16_t         sockId;
     int16_t         idx = 0;
@@ -872,10 +898,18 @@ int32_t bsdNewTcpClient(uint16_t port, int16_t sid)
 
     while (idx < NUM_OF_PKT)
     {
-        status = sl_Send(sockId,
-                         &ClientMsg_appData,
-                         sizeof(ClientMsg_ControlBlock),
-                         0);
+        if (msg_type == WIFI_msg_type1) {           // Send Type 1 message
+            status = sl_Send(sockId,
+                             &ClientMsg_appData,
+                             sizeof(ClientMsg_ControlBlock),
+                             0);
+        } else if (msg_type == WIFI_msg_type2) {    // Send Type 2 message
+            status = sl_Send(sockId,
+                             &T2Msg_appData,
+                             sizeof(ClientT2Msg_ControlBlock),
+                             0);
+        }
+
         /* Success: status = number of bytes sent */
         /* Fail: status = -1 */
         //UART_printf("status of sl_Send = %d\n\r", status);
@@ -897,6 +931,25 @@ int32_t bsdNewTcpClient(uint16_t port, int16_t sid)
     }
     //return(0);
     return(status);
+}
+
+/*
+ * All credit to:
+ * https://cboard.cprogramming.com/c-programming/121572-how-swap-endianness-float.html
+ */
+float fl_htonl(float value)
+{
+    union v {
+        float           f;
+        uint32_t        i;
+    };
+
+    union v val;
+
+    val.f = value;
+    val.i = sl_Htonl(val.i);
+
+    return val.f;
 }
 
 //*****************************************************************************

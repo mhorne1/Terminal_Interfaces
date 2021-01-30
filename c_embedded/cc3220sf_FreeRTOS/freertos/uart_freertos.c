@@ -252,6 +252,16 @@ void simpleConsole(UART_Handle uart)
                 break;
             case 'A': // Display and then send TCP Client message
                 qMsgSend.header = WIFI_cmsg;
+                //xQueueSendToBack( xQueue1, &qMsgSend, 0 );
+                UART_printf("Enter '1' or '2'\r\n");
+                getString(tempStr,sizeof(tempStr));
+                if (tempStr[0] == '1') {
+                    qMsgSend.param = WIFI_msg_type1;    // Select Type 1 message
+                } else if (tempStr[0] == '2') {
+                    qMsgSend.param = WIFI_msg_type2;    // Select Type 2 message
+                } else {
+                    break;                              // Invalid selection
+                }
                 xQueueSendToBack( xQueue1, &qMsgSend, 0 );
                 break;
             case 'm': // Check memory heap allocation
