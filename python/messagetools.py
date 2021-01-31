@@ -26,7 +26,9 @@ def get_message(myqueue):
     #new_msg = input("Please enter a new message...")
     new_msg = input()
     #print(f"Adding message '{new_msg}' to queue!")
-    if new_msg[0].isnumeric():
+    if new_msg == "":
+        return status
+    elif new_msg[0].isnumeric():
         if int(new_msg[0]) == 1:
             print(f"Adding message '{new_msg[2:]}' to queue!")
             myqueue.put((1,new_msg[2:]))
@@ -35,44 +37,51 @@ def get_message(myqueue):
         status = False
     return status
     
-def msg_packer(message_dict, message_type, message_pack, *message_args):
+def msg_packer(message_dict, message_type, message_length, message_pack, *message_args):
     '''
     Uses message_type to determine how message is packed
     Parameters
     ----------
     message_dict : Keys are the message types and values are the packing functions
     message_type : Specific type of message
+    message_length: Number of bytes that comprise the message
     message_args : Text string or tuple
     Returns
     -------
     Bytes object of message
     '''
     if message_type in message_dict:
-        return message_dict[message_type](message_pack, *message_args)
+        return message_dict[message_type](message_length, message_pack, *message_args)
     else:
         return b""
     
-def msg_type1_pack(pack_message, message):
+def msg_type1_pack(length, pack_message, message):
     '''
     Encodes or decodes type 1 messages
     Parameters
     ----------
+    length: Number of bytes that comprise the message
     pack_message : True or False
     message : Text string, or byte encoded text string
     Returns
     -------
     Byte encoded text string, or text string
     '''
+    if (length != -1) and (length != len(message)):
+        print("Specified message length incompatible with message type 1")
+        return b""
+    
     if pack_message == True:
         return message.encode("utf-8")
     else:
         return message.decode("utf-8")
 
-def msg_type2_pack(pack_message, message):
+def msg_type2_pack(length, pack_message, message):
     '''
     Packs or unpacks type 2 messages
     Parameters
     ----------
+    length: Number of bytes that comprise the message
     pack_message : True or False
     message : Tuple (4 uint32, 4 float), or byte encoded tuple
     Returns
@@ -80,16 +89,21 @@ def msg_type2_pack(pack_message, message):
     Network (big-endian) byte encoded tuple, or tuple
     '''
     STRUCT_FORMAT = "!4I4f"
+    if (length != -1) and (length != struct.calcsize(STRUCT_FORMAT)):
+        print("Specified message length incompatible with message type 2")
+        return b""
+    
     if pack_message == True:
         return struct.pack(STRUCT_FORMAT, *message)
     else:
         return struct.unpack(STRUCT_FORMAT, message)
 
-def msg_type3_pack(pack_message, message):
+def msg_type3_pack(length, pack_message, message):
     '''
     Packs or unpacks type 3 acknowledge messages
     Parameters
     ----------
+    length: Number of bytes that comprise the message
     pack_message : True or False
     message : Tuple (2 uint32, 1 int32, 1 float32), or byte encoded tuple
     Returns
@@ -97,6 +111,10 @@ def msg_type3_pack(pack_message, message):
     Network (big-endian) byte encoded tuple, or tuple
     '''
     STRUCT_FORMAT = "!2I1i1f"
+    if (length != -1) and (length != struct.calcsize(STRUCT_FORMAT)):
+        print("Specified message length incompatible with message type 3")
+        return b""
+    
     if pack_message == True:
         return struct.pack(STRUCT_FORMAT, *message)
     else:
@@ -192,14 +210,16 @@ def send_message(send_socket, header_format, msg_number, msg_queue):
         msg_t = msg_queue.get()
         msg_type = msg_t[0]
         msg = msg_t[1]
-        msg_pack = True # Pack or Unpack message
-        packedmsg = msg_packer(msg_dict, msg_type, msg_pack, msg)
-        msglen = len(packedmsg)
-        packedheader = struct.pack(header_format, msglen, msg_type, msg_number)
+        msg_len = -1 # Signify that message is being packed and that length is currently unknown
+        msg_pack = True # Pack (True) or Unpack (False) message
+        packedmsg = msg_packer(msg_dict, msg_type, msg_len, msg_pack, msg)
+        msg_len = len(packedmsg)
+        packedheader = struct.pack(header_format, msg_len, msg_type, msg_number)
         #msg_number += 1
         full_msg = packedheader + packedmsg
         try:
-            print(f"Sending message #{msg_number}, msg_type: {msg_type}")
+            #print(f"Sending message #{msg_number}, msg_type: {msg_type}, msg_len: {msg_len}")
+            print(f"SEND: msg_len = {msg_len}, msg_type = {msg_type}, msg_number = {msg_number}")
             send_socket.send(full_msg)
             status = 1 # Message sent
         except socket.error as emsg:
@@ -244,7 +264,7 @@ def recv_message(recv_socket, recv_timeout, header_format, buffer_size, recv_que
             if recv_timeout_count < recv_timeout_max:
                 continue
             else:
-                print("RECV timeout...")
+                #print("RECV timeout...")
                 #total_messages = MESSAGES_MAX
                 status = -2 # Timeout
                 break
@@ -265,21 +285,21 @@ def recv_message(recv_socket, recv_timeout, header_format, buffer_size, recv_que
             msglen = msgheaderunpacked[0]
             msgtype = msgheaderunpacked[1]
             msgnumber = msgheaderunpacked[2]
-            print(f"RECV: msglen is: {msglen}, msgtype is: {msgtype}, msgnumber is: {msgnumber}")
+            print(f"RECV: msglen = {msglen}, msgtype = {msgtype}, msgnumber = {msgnumber}")
             full_msg = msg[header_size:]
+            bytes_read = buffer_size - header_size
         else:
             full_msg += msg
-        
-        bytes_read += buffer_size
+            bytes_read += buffer_size
         
         if bytes_read >= msglen:
-            msgpack = False # Pack or Unpack message
-            unpacked_message = msg_packer(msg_dict, msgtype, msgpack, full_msg[:msglen])
+            msgpack = False # Pack (True) or Unpack (False) message
+            unpacked_message = msg_packer(msg_dict, msgtype, msglen, msgpack, full_msg[:msglen])
             print(f"RECV: {unpacked_message}")
             if msgtype == 3:
                 recv_queue.put(unpacked_message)
             else:
-                recv_queue.put((3,(msgtype,0,0,0)))
+                recv_queue.put((3,(msgtype,msglen,0,0)))
             record_queue.put((msgtype,unpacked_message))
             status = 1
             break
