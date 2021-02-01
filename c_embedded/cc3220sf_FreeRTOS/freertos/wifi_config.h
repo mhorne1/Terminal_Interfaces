@@ -30,6 +30,7 @@ typedef enum
     WIFI_cset,      // Change WIFI settings
     WIFI_conn,      // Connect to WIFI
     WIFI_cmsg,      // Send client message to server, requires WIFI connection
+    WIFI_rmsg,      // Receive message from server, requires WIFI connection
     WIFI_utim,      // Update device time, requires WIFI connection, redundant with ClockSync_get()
     WIFI_dtim,      // Display device time (UTC), requires WIFI connection
     WIFI_dmsg,      // Display TCP Client message, requires WIFI connection

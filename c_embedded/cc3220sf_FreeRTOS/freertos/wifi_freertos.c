@@ -148,7 +148,11 @@ int32_t g_wifiMode;
 //****************************************************************************
 void wifiTask(void *pvParameters);
 int wifiManager( unsigned int cmd );
+int32_t recvTcpClient(int16_t sid);
+int32_t recvT1Msg(int16_t sid, uint32_t msg_len);
+int32_t recvT2Msg(int16_t sid, uint32_t msg_len);
 float fl_htonl(float value);
+float fl_ntohl(float value);
 
 //****************************************************************************
 //                          EXTERNAL FUNCTIONS
@@ -244,6 +248,7 @@ int wifiManager(unsigned int cmd)
 {
     int32_t status = -1;        // Function return value
     int32_t send_status = 0;    // Function return value for TCP Client
+    int32_t recv_status = 0;    // Function return value for TCP Client
     float outTempC;             // Temperature value in Celsius
     float outTempF;             // Temperature value in Fahrenheit
     int8_t outxVal;             // Accelerometer X-axis value
@@ -452,6 +457,14 @@ int wifiManager(unsigned int cmd)
             send_status = bsdCustomTcpClient(PowerMeasure_appData.port,
                                              PowerMeasure_appData.sockID,
                                              qMsgRecv.param);
+            break;
+        case WIFI_rmsg: // Test receiving new client message
+            UART_printf("Receiving new server message\n\r");
+            recv_status = -1;
+            recv_status = recvTcpClient(PowerMeasure_appData.sockID);
+            if (recv_status <= 0) {
+                UART_printf("Failed to receive server message\n\r");
+            }
             break;
         case WIFI_csid: // Close TCP Client socket ID
             if (PowerMeasure_appData.sockID != OPEN_SOCK_ONCE) {
@@ -934,6 +947,104 @@ int32_t bsdCustomTcpClient(uint16_t port, int16_t sid, int16_t msg_type)
 }
 
 /*
+ * Receive message header
+ */
+int32_t recvTcpClient(int16_t sid)
+{
+    int16_t status = -1;
+    ClientHeader_ControlBlock recv_header;
+
+    if (sid >= 0) {
+        status = sl_Recv(sid,
+                         &recv_header,
+                         sizeof(ClientHeader_ControlBlock),
+                         SL_MSG_DONTWAIT);
+        if (status >= 0) {
+            recv_header.msg_len = sl_Ntohl(recv_header.msg_len);
+            recv_header.msg_type = sl_Ntohl(recv_header.msg_type);
+            recv_header.msg_number = sl_Ntohl(recv_header.msg_number);
+
+            UART_printf("RECV: msg_len = %u msg_type = %u msg_number= %u\n\r",
+                        recv_header.msg_len,
+                        recv_header.msg_type,
+                        recv_header.msg_number);
+
+            switch (recv_header.msg_type) {
+                case WIFI_msg_type1:
+                    status = recvT1Msg(sid, recv_header.msg_len);
+                    break;
+                case WIFI_msg_type2:
+                    status = recvT2Msg(sid, recv_header.msg_len);
+                    break;
+                case WIFI_msg_type3:
+                    break;
+                default:
+                    UART_printf("RECV: Unknown message type %u\n\r",
+                                recv_header.msg_type);
+                    break;
+            }
+        }
+    }
+
+    return status;
+}
+
+/*
+ * Receive type 1 message (text)
+ */
+int32_t recvT1Msg(int16_t sid, uint32_t msg_len) {
+    int16_t status = -1;
+    signed char textData[FRAME_LENGTH];
+
+    if (msg_len <= FRAME_LENGTH) {
+        status = sl_Recv(sid,
+                         textData,
+                         msg_len,
+                         SL_MSG_DONTWAIT);
+    } else {
+        status = sl_Recv(sid,
+                         textData,
+                         FRAME_LENGTH,
+                         SL_MSG_DONTWAIT);
+    }
+
+    if (status >= 0) {
+        UART_printf("RECV: %s\n\r", textData);
+    }
+
+    return status;
+}
+
+/*
+ * Receive type 2 message (numeric)
+ */
+int32_t recvT2Msg(int16_t sid, uint32_t msg_len) {
+    int16_t status = -1;
+    T2Msg_ControlBlock numericData;
+
+    if (msg_len == sizeof(T2Msg_ControlBlock)) {
+        status = sl_Recv(sid,
+                         &numericData,
+                         sizeof(T2Msg_ControlBlock),
+                         SL_MSG_DONTWAIT);
+    }
+
+    if (status >= 0) {
+        numericData.var_a = sl_Ntohl(numericData.var_a);
+        numericData.var_b = sl_Ntohl(numericData.var_b);
+        numericData.var_c = sl_Ntohl(numericData.var_c);
+        numericData.var_d = sl_Ntohl(numericData.var_d);
+        UART_printf("RECV: a = %u b = %u c = %u d = %u\n\r",
+                    numericData.var_a,
+                    numericData.var_b,
+                    numericData.var_c,
+                    numericData.var_d);
+    }
+
+    return status;
+}
+
+/*
  * All credit to:
  * https://cboard.cprogramming.com/c-programming/121572-how-swap-endianness-float.html
  */
@@ -948,6 +1059,25 @@ float fl_htonl(float value)
 
     val.f = value;
     val.i = sl_Htonl(val.i);
+
+    return val.f;
+}
+
+/*
+ * All credit to:
+ * https://cboard.cprogramming.com/c-programming/121572-how-swap-endianness-float.html
+ */
+float fl_ntohl(float value)
+{
+    union v {
+        float           f;
+        uint32_t        i;
+    };
+
+    union v val;
+
+    val.f = value;
+    val.i = sl_Ntohl (val.i);
 
     return val.f;
 }

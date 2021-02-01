@@ -92,6 +92,8 @@ const char helpPrompt[]     = "Valid Commands\r\n"                  \
                               "7: Test TCP Client\r\n"              \
                               "8: Close TCP Client socket\r\n"      \
                               "9: Send TCP Client message\r\n"      \
+                              "z: Send new TCP message\r\n"         \
+                              "x: Receive new TCP message\r\n"      \
                               "--------------\r\n"                  \
                               "m: Display current memory heap\r\n"  \
                               "s: Display task stack usage\r\n"     \
@@ -250,9 +252,8 @@ void simpleConsole(UART_Handle uart)
                 qMsgSend.header = WIFI_tcli;
                 xQueueSendToBack( xQueue1, &qMsgSend, 0 );
                 break;
-            case 'A': // Display and then send TCP Client message
+            case 'z': // Send new TCP message
                 qMsgSend.header = WIFI_cmsg;
-                //xQueueSendToBack( xQueue1, &qMsgSend, 0 );
                 UART_printf("Enter '1' or '2'\r\n");
                 getString(tempStr,sizeof(tempStr));
                 if (tempStr[0] == '1') {
@@ -262,6 +263,10 @@ void simpleConsole(UART_Handle uart)
                 } else {
                     break;                              // Invalid selection
                 }
+                xQueueSendToBack( xQueue1, &qMsgSend, 0 );
+                break;
+            case 'x': // Receive new TCP message from server
+                qMsgSend.header = WIFI_rmsg;
                 xQueueSendToBack( xQueue1, &qMsgSend, 0 );
                 break;
             case 'm': // Check memory heap allocation
