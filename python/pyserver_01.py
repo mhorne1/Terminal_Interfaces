@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[3]:
+# In[1]:
 
 
 # "pyserver_01.py <port>"
@@ -149,6 +149,30 @@ def server_thread(xhost, xport, xheaderformat, recvq, sendq, recordq):
     if not serverevent.is_set():
         serverevent.set()
 
+def record_thread(rec_queue):
+    '''
+    Records messages that are retrieved from a queue
+    Parameters
+    ----------
+    rec_queue : Queue that can contain new messages to be recorded
+    Returns
+    -------
+    None
+    '''
+    dir_name = mt.get_datetime_name()
+    while True:
+        if rec_queue.empty() == False:
+            msg_t = rec_queue.get()
+            msg_type = msg_t[0]
+            msg = msg_t[1]
+            if msg_type == 1:
+                mt.record_text(dir_name, mt.get_timestamp(msg))
+            elif msg_type == 2:
+                mt.record_csv(dir_name, msg)
+        if serverevent.is_set(): # Check after recording message
+            break
+        time.sleep(0.1)
+
 def input_thread(message_queue):
     '''
     Prompts user to enter new messages
@@ -174,8 +198,10 @@ def input_thread(message_queue):
 thr1 = threading.Thread(target=server_thread, args=(HOST, PORT, HEADER_FORMAT,
                                                     recv_q, send_q, record_q))
 thr2 = threading.Thread(target=input_thread, args=(send_q, ))
+thr3 = threading.Thread(target=record_thread, args=(record_q, ))
 thr1.start()
 thr2.start()
+thr3.start()
 
 # Main Thread
 msg_count = 0
@@ -185,7 +211,7 @@ while True:
             print("Pyserver event is set!")
             break
         else:
-            time.sleep(5)
+            time.sleep(10)
             if msg_count < 5:
                 msg_count += 1
                 # Send default text message
@@ -199,6 +225,7 @@ while True:
 
 thr1.join()
 thr2.join()
+thr3.join()
 
 # Empty each queue
 while not recv_q.empty():
