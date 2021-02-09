@@ -296,10 +296,10 @@ def recv_message(recv_socket, recv_timeout, header_format, buffer_size, recv_que
             msgpack = False # Pack (True) or Unpack (False) message
             unpacked_message = msg_packer(msg_dict, msgtype, msglen, msgpack, full_msg[:msglen])
             print(f"RECV: {unpacked_message}")
-            if msgtype == 3:
+            if msgtype == 3: # Receive ACK
                 recv_queue.put(unpacked_message)
-            else:
-                recv_queue.put((3,(msgtype,msglen,0,0)))
+            else: # Send ACK
+                recv_queue.put((3,(msglen,msgtype,msgnumber,0)))
             record_queue.put((msgtype,unpacked_message))
             status = 1
             break

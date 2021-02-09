@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[11]:
+# In[1]:
 
 
 # "pyclient_01.py <IPv4 or IPv6 addr> <port>"
@@ -114,11 +114,16 @@ def client_thread(xhost, xport, xheaderformat, xbuffersize, recvq, sendq,
             break
         elif recv_status == -2: # Timeout
             #break
+            # Send sequence
+            if sendq.empty() == False:
+                send_status = mt.send_message(pyclient, xheaderformat,
+                                              client_msgnumber, sendq)
+                client_msgnumber += 1
             continue
         else: # Message received
             total_messages += 1
         
-        # Send sequence
+        # ACK sequence
         #pyclient.send(b"ACK") # Acknowledgement
         if recvq.empty() == False:
             #msg_type = xsendqueue.get()

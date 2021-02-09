@@ -126,7 +126,8 @@ def server_thread(xhost, xport, xheaderformat, recvq, sendq, recordq):
                             #print(f"recv_status: {recv_status}")
                             if recvq.empty() == False:
                                 msg_t = recvq.get()
-                                print(f"Received ACK: {msg_t}")
+                                if msg_t[0] != 3:
+                                    print(f"Received ACK: {msg_t}")
                     except socket.timeout as emsg:
                         #print(f"RECV socket.timeout exception: {emsg}")
                         msg_recv = b""
