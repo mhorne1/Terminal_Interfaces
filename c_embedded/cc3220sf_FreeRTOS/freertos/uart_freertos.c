@@ -41,6 +41,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 /* RTOS header files */
 #include <FreeRTOS.h>
@@ -63,6 +64,7 @@
 #include "freertos/common.h"
 #include "freertos/i2c_setup.h"
 #include "freertos/wifi_config.h"
+#include "freertos/system_status.h"
 
 //****************************************************************************
 //                          GLOBAL VARIABLES
@@ -171,6 +173,7 @@ void simpleConsole(UART_Handle uart)
     int8_t localyVal;       // Accelerometer Y-axis value
     int8_t localzVal;       // Accelerometer Z-axis value
     char tempStr[MAX_SSID_LENGTH];  // Input string buffer
+    uint16_t tempVar;       // Numeric input buffer
 
     UART_writePolling(uart, projectDisplay, sizeof(projectDisplay));
     UART_printf("UART Console (h for help)\r\n");
@@ -268,6 +271,35 @@ void simpleConsole(UART_Handle uart)
             case 'x': // Receive new TCP message from server
                 qMsgSend.header = WIFI_rmsg;
                 xQueueSendToBack( xQueue1, &qMsgSend, 0 );
+                break;
+            case 'b': // Set status bit
+                UART_printf("Enter a number [0-F]\r\n");
+                //getString(tempStr,sizeof(tempStr));
+                //tempVar = atoi(tempStr);
+                UART_read(uart, &cmd, sizeof(cmd));
+                UART_writePolling(uart, &cmd, sizeof(cmd));
+                UART_writePolling(uart, crlfDisplay, sizeof(crlfDisplay));
+                if ((cmd>='0') && (cmd<='9')) {
+                    tempVar = cmd - '0';                // '0' == 48
+                } else if ((cmd>='A') && (cmd<='F')) {
+                    tempVar = (cmd - 'A') + 10;         // 'A' == 65
+                } else if ((cmd>='a') && (cmd<='f')) {
+                    tempVar = (cmd - 'a') + 10;         // 'a' == 97
+                }
+                //UART_printf("tempVar = %u\r\n", tempVar);
+                UART_printf("Assert or Clear?\r\n");
+                UART_read(uart, &cmd, sizeof(cmd));
+                UART_writePolling(uart, &cmd, sizeof(cmd));
+                UART_writePolling(uart, crlfDisplay, sizeof(crlfDisplay));
+                if ((cmd=='A') || (cmd=='a')) {
+                    setStatus(appStatus, tempVar, true);
+                } else {
+                    setStatus(appStatus, tempVar, false);
+                }
+                UART_printf("appStatus[0] = 0x%08X\r\n",
+                            appStatus[0]);
+                UART_printf("appStatus[1] = 0x%08X\r\n",
+                            appStatus[1]);
                 break;
             case 'm': // Check memory heap allocation
                 UART_printf("configTOTAL_HEAP_SIZE: %d\r\n",
