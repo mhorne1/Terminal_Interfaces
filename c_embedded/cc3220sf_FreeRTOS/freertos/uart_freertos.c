@@ -41,7 +41,6 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
-#include <stdio.h>
 
 /* RTOS header files */
 #include <FreeRTOS.h>
@@ -96,6 +95,7 @@ const char helpPrompt[]     = "Valid Commands\r\n"                  \
                               "9: Send TCP Client message\r\n"      \
                               "z: Send new TCP message\r\n"         \
                               "x: Receive new TCP message\r\n"      \
+                              "b: Test status bits\r\n"             \
                               "--------------\r\n"                  \
                               "m: Display current memory heap\r\n"  \
                               "s: Display task stack usage\r\n"     \
@@ -111,8 +111,12 @@ void uartTask(void *pvParameters);
 void simpleConsole(UART_Handle uart);
 void UART_send(const char *str);
 int UART_printf(const char *pcFormat, ...);
+int getChar(char *pcBuffer);
 int getString(char *pcBuffer, unsigned int bufLen);
 void configureWIFI(char *pBuffer, unsigned int bufSize);
+void checkTemp(void);
+void checkAccel(void);
+void testStatusBits(char *pcmd);
 
 //****************************************************************************
 //                          EXTERNAL FUNCTIONS
@@ -121,6 +125,9 @@ extern int vsnprintf(char * s, size_t n, const char * format, va_list arg);
 
 /*
  *  ======== uartTask ========
+ *  Initializes UART and runs command console
+ *  pvParameters - Optional void pointer
+ *  return - void
  */
 void uartTask(void *pvParameters)
 {
@@ -147,7 +154,7 @@ void uartTask(void *pvParameters)
             while (1);
         }
 
-        simpleConsole(uart);
+        simpleConsole(uart);    // Run command console
 
         /*
          * Since we returned from the console, we need to close the UART.
@@ -165,58 +172,22 @@ void uartTask(void *pvParameters)
  */
 void simpleConsole(UART_Handle uart)
 {
-    char cmd;               // Input character
-    int status;             // Function return value
-    float localTempC;       // Temperature value in Celsius
-    float localTempF;       // Temperature value in Fahrenheit
-    int8_t localxVal;       // Accelerometer X-axis value
-    int8_t localyVal;       // Accelerometer Y-axis value
-    int8_t localzVal;       // Accelerometer Z-axis value
+    char cmd;                       // Input character
     char tempStr[MAX_SSID_LENGTH];  // Input string buffer
-    uint16_t tempVar;       // Numeric input buffer
 
     UART_writePolling(uart, projectDisplay, sizeof(projectDisplay));
     UART_printf("UART Console (h for help)\r\n");
 
-    /* Loop until read fails or user quits */
+    /* Loop forever */
     while (1) {
-        UART_writePolling(uart, userPrompt, sizeof(userPrompt));
-        status = UART_read(uart, &cmd, sizeof(cmd));
-        if (status == 0) {
-            UART_writePolling(uart, readErrDisplay, sizeof(readErrDisplay));
-            cmd = 'h';
-        }
-
-        UART_writePolling(uart, &cmd, sizeof(cmd));
-        UART_writePolling(uart, crlfDisplay, sizeof(crlfDisplay));
+        getChar(&cmd);              // Get command char from input
 
         switch (cmd) {
             case 't': // Display temperature data
-                /*
-                 *  Access the global float temperature variables in a
-                 *  thread-safe manner.
-                 *  Semaphores should be created to protect these global variables
-                 */
-                taskENTER_CRITICAL();
-                localTempC = g_temperatureC;
-                localTempF = g_temperatureF;
-                taskEXIT_CRITICAL();
-                UART_printf("Current temp = %3.2fC (%3.2fF)\n\r", localTempC, localTempF);
+                checkTemp();
                 break;
             case 'a': // Display accelerometer data
-                /*
-                 *  Access the global int8_t accelerometer variables in a
-                 *  thread-safe manner.
-                 *  Semaphores should be created to protect these global variables
-                 */
-                taskENTER_CRITICAL();
-                localxVal = (int8_t)g_xVal;
-                localyVal = (int8_t)g_yVal;
-                localzVal = (int8_t)g_zVal;
-                taskEXIT_CRITICAL();
-                UART_printf("AccX = %d\n\r", localxVal);
-                UART_printf("AccY = %d\n\r", localyVal);
-                UART_printf("AccZ = %d\n\r", localzVal);
+                checkAccel();
                 break;
             case '1': // Display WIFI settings and status
                 qMsgSend.header = WIFI_dset;
@@ -258,10 +229,10 @@ void simpleConsole(UART_Handle uart)
             case 'z': // Send new TCP message
                 qMsgSend.header = WIFI_cmsg;
                 UART_printf("Enter '1' or '2'\r\n");
-                getString(tempStr,sizeof(tempStr));
-                if (tempStr[0] == '1') {
+                getChar(&cmd);
+                if (cmd == '1') {
                     qMsgSend.param = WIFI_msg_type1;    // Select Type 1 message
-                } else if (tempStr[0] == '2') {
+                } else if (cmd == '2') {
                     qMsgSend.param = WIFI_msg_type2;    // Select Type 2 message
                 } else {
                     break;                              // Invalid selection
@@ -273,33 +244,7 @@ void simpleConsole(UART_Handle uart)
                 xQueueSendToBack( xQueue1, &qMsgSend, 0 );
                 break;
             case 'b': // Set status bit
-                UART_printf("Enter a number [0-F]\r\n");
-                //getString(tempStr,sizeof(tempStr));
-                //tempVar = atoi(tempStr);
-                UART_read(uart, &cmd, sizeof(cmd));
-                UART_writePolling(uart, &cmd, sizeof(cmd));
-                UART_writePolling(uart, crlfDisplay, sizeof(crlfDisplay));
-                if ((cmd>='0') && (cmd<='9')) {
-                    tempVar = cmd - '0';                // '0' == 48
-                } else if ((cmd>='A') && (cmd<='F')) {
-                    tempVar = (cmd - 'A') + 10;         // 'A' == 65
-                } else if ((cmd>='a') && (cmd<='f')) {
-                    tempVar = (cmd - 'a') + 10;         // 'a' == 97
-                }
-                //UART_printf("tempVar = %u\r\n", tempVar);
-                UART_printf("Assert or Clear?\r\n");
-                UART_read(uart, &cmd, sizeof(cmd));
-                UART_writePolling(uart, &cmd, sizeof(cmd));
-                UART_writePolling(uart, crlfDisplay, sizeof(crlfDisplay));
-                if ((cmd=='A') || (cmd=='a')) {
-                    setStatus(appStatus, tempVar, true);
-                } else {
-                    setStatus(appStatus, tempVar, false);
-                }
-                UART_printf("appStatus[0] = 0x%08X\r\n",
-                            appStatus[0]);
-                UART_printf("appStatus[1] = 0x%08X\r\n",
-                            appStatus[1]);
+                testStatusBits(&cmd);
                 break;
             case 'm': // Check memory heap allocation
                 UART_printf("configTOTAL_HEAP_SIZE: %d\r\n",
@@ -439,10 +384,33 @@ int UART_printf(const char *pcFormat, ...)
 
 //*****************************************************************************
 //
+//! Get input char from UART
+//!
+//! \param[in]  pcBuffer    - is where input is stored
+//!
+//! \return Length of the bytes received. -1 if buffer length exceeded.
+//!
+//*****************************************************************************
+int getChar(char *pcBuffer)
+{
+    int status = 0;
+
+    status = UART_read(uart, pcBuffer, sizeof(*pcBuffer));
+    if (status == 0) {
+        UART_writePolling(uart, readErrDisplay, sizeof(readErrDisplay));
+        *(pcBuffer) = 'h';
+    } else {
+        UART_writePolling(uart, pcBuffer, sizeof(*pcBuffer));
+        UART_writePolling(uart, crlfDisplay, sizeof(crlfDisplay));
+    }
+    return status;
+}
+
+//*****************************************************************************
+//
 //! Get input string from UART
 //!
-//! \param[in]  pcBuffer    - is the command store to which command will be
-//!                           populated
+//! \param[in]  pcBuffer    - is where input is stored
 //! \param[in]  bufLen      - is the length of buffer store available
 //!
 //! \return Length of the bytes received. -1 if buffer length exceeded.
@@ -504,4 +472,98 @@ void configureWIFI(char *pBuffer, unsigned int bufSize)
     getString(pBuffer,bufSize);
     qMsgSend.param = WIFI_cfg_key;
     xQueueSendToBack( xQueue1, &qMsgSend, 0 );
+}
+
+/*
+ *  ======== checkTemp ========
+ *  This function allows user input to view the most recent temperature sensor
+ *  values that were read
+ *  parameters - void
+ *  return - void
+ */
+void checkTemp(void)
+{
+    float localTempC;       // Temperature value in Celsius
+    float localTempF;       // Temperature value in Fahrenheit
+
+    /*
+    *  Access the global float temperature variables in a
+    *  thread-safe manner.
+    *  Semaphores should be created to protect these global variables
+    */
+    taskENTER_CRITICAL();
+    localTempC = g_temperatureC;
+    localTempF = g_temperatureF;
+    taskEXIT_CRITICAL();
+    UART_printf("Current temp = %3.2fC (%3.2fF)\n\r", localTempC, localTempF);
+}
+
+/*
+ *  ======== checkAccel ========
+ *  This function allows user input to view the most recent accelerometer
+ *  sensor values that were read
+ *  parameters - void
+ *  return - void
+ */
+void checkAccel(void)
+{
+    int8_t localxVal;       // Accelerometer X-axis value
+    int8_t localyVal;       // Accelerometer Y-axis value
+    int8_t localzVal;       // Accelerometer Z-axis value
+
+    /*
+     *  Access the global int8_t accelerometer variables in a
+     *  thread-safe manner.
+     *  Semaphores should be created to protect these global variables
+     */
+    taskENTER_CRITICAL();
+    localxVal = (int8_t)g_xVal;
+    localyVal = (int8_t)g_yVal;
+    localzVal = (int8_t)g_zVal;
+    taskEXIT_CRITICAL();
+    UART_printf("AccX = %d\n\r", localxVal);
+    UART_printf("AccY = %d\n\r", localyVal);
+    UART_printf("AccZ = %d\n\r", localzVal);
+}
+
+/*
+ *  ======== testStatusBits ========
+ *  This function allows user input to either assert or clear
+ *  one of the status bits
+ *  pcmd - char pointer
+ *  return - void
+ */
+void testStatusBits(char *pcmd)
+{
+    uint16_t tempVar;       // Numeric input buffer
+
+    UART_printf("Enter a number [0-F]\r\n");
+    //getString(tempStr,sizeof(tempStr));
+    //tempVar = atoi(tempStr);
+    getChar(pcmd);
+    if ((*pcmd>='0') && (*pcmd<='9')) {
+        tempVar = *pcmd - '0';                // '0' == 48
+    } else if ((*pcmd>='A') && (*pcmd<='F')) {
+        tempVar = (*pcmd - 'A') + 10;         // 'A' == 65
+    } else if ((*pcmd>='a') && (*pcmd<='f')) {
+        tempVar = (*pcmd - 'a') + 10;         // 'a' == 97
+    }
+
+    UART_printf("Status word 0 or 1?\r\n");
+    getChar(pcmd);
+    if (*pcmd=='1') {
+        tempVar += 32;
+    }
+
+    //UART_printf("tempVar = %u\r\n", tempVar);
+
+    UART_printf("Assert or Clear?\r\n");
+    getChar(pcmd);
+    if ((*pcmd=='A') || (*pcmd=='a')) {
+        setStatus(appStatus, tempVar, true);
+    } else {
+        setStatus(appStatus, tempVar, false);
+    }
+    UART_printf("appStatus[0] = 0x%08X, appStatus[1] = 0x%08X\r\n",
+                appStatus[0], appStatus[1]);
 }
