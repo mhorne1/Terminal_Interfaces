@@ -154,6 +154,8 @@ void uartTask(void *pvParameters)
             while (1);
         }
 
+        setStatus(appStatus, STATUS_UART_INIT, true);
+
         simpleConsole(uart);    // Run command console
 
         /*
@@ -564,6 +566,6 @@ void testStatusBits(char *pcmd)
     } else {
         setStatus(appStatus, tempVar, false);
     }
-    UART_printf("appStatus[0] = 0x%08X, appStatus[1] = 0x%08X\r\n",
+    UART_printf("appStatus[0] = 0x%08X\r\nappStatus[1] = 0x%08X\r\n",
                 appStatus[0], appStatus[1]);
 }

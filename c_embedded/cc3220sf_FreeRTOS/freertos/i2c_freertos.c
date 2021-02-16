@@ -60,6 +60,7 @@
 #include "freertos/common.h"
 #include "freertos/i2c_setup.h"
 #include "freertos/wifi_config.h"
+#include "freertos/system_status.h"
 
 //****************************************************************************
 // GLOBAL VARIABLES
@@ -149,6 +150,8 @@ void i2cTask(void *pvParameters)
             }
         }
     }
+
+    setStatus(appStatus, STATUS_I2C_INIT, true);
 
     lastWake = xTaskGetTickCount(); // Set starting point for task timing
 

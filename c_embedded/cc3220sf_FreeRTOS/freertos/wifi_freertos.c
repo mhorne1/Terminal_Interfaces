@@ -66,6 +66,7 @@
 #include "freertos/wifi_time.h"
 #include "freertos/wifi_client.h"
 #include "freertos/i2c_setup.h"
+#include "freertos/system_status.h"
 
 //****************************************************************************
 //                          GLOBAL VARIABLES
@@ -148,6 +149,9 @@ int32_t g_wifiMode;
 //****************************************************************************
 void wifiTask(void *pvParameters);
 int wifiManager( unsigned int cmd );
+void wifiDisplaySettings(void);
+void wifiChangeSettings(int32_t config, char *pcBuf);
+void wifiConnectStandard(void);
 int32_t recvTcpClient(int16_t sid);
 int32_t recvT1Msg(int16_t sid, uint32_t msg_len);
 int32_t recvT2Msg(int16_t sid, uint32_t msg_len);
@@ -217,6 +221,8 @@ void wifiTask(void *pvParameters)
 
     g_wifiMode = mode; // Store copy of WIFI mode
 
+    setStatus(appStatus, STATUS_WIFI_INIT, true);
+
     while(1)
     {
         if ((mode == ROLE_STA) &&
@@ -256,9 +262,6 @@ int wifiManager(unsigned int cmd)
     int8_t outzVal;             // Accelerometer Z-axis value
     struct tm netTime;          // Acquired time value
     char *timeString;           // Pointer to string converted from time value
-    uint8_t ssid[33];           // Used for WIFI connection
-    uint16_t len = 33;          // Used for WIFI connection
-    uint16_t config_opt = SL_WLAN_AP_OPT_SSID;  // Used for WIFI connection
 
     if (g_wifiConnectFlag == false) {
         if (cmd > WIFI_conn) {
@@ -274,78 +277,19 @@ int wifiManager(unsigned int cmd)
 
     switch (cmd) {
         case WIFI_dset: // Display WIFI settings and status
-            UART_printf("WIFI Name = %s\n\r", WifiSetup_CB.ssid);
-            if (WifiSetup_CB.security == SL_WLAN_SEC_TYPE_WPA_WPA2) {
-                UART_printf("Security Type = WPA2\n\r");
-                UART_printf("Password = %s\n\r", WifiSetup_CB.key);
-            } else if (WifiSetup_CB.security == SL_WLAN_SEC_TYPE_OPEN) {
-                UART_printf("Security type = OPEN\n\r");
-                UART_printf("No password for public/open WIFI\n\r");
-            }
-
-            UART_printf("External TCP Server Settings:\n\r");
-            UART_printf("IP Address = %d.%d.%d.%d\n\r",
-                        (uint8_t)SL_IPV4_BYTE(PowerMeasure_appData.ipAddr,3),
-                        (uint8_t)SL_IPV4_BYTE(PowerMeasure_appData.ipAddr,2),
-                        (uint8_t)SL_IPV4_BYTE(PowerMeasure_appData.ipAddr,1),
-                        (uint8_t)SL_IPV4_BYTE(PowerMeasure_appData.ipAddr,0));
-            UART_printf("Port = %d\n\r", PowerMeasure_appData.port);
-
-            UART_printf("WIFI Activity Status:\n\r");
-            UART_printf("WIFI ");
-            if (g_wifiConnectFlag == true) {
-                UART_printf("[Connected]\n\r");
-            } else {
-                UART_printf("[Disconnected]\n\r");
-            }
-            UART_printf("Time ");
-            if (g_timeAcquiredFlag == true) {
-                UART_printf("[Acquired]\n\r");
-            } else {
-                UART_printf("[Not Acquired]\n\r");
-            }
-            UART_printf("TCP Client ");
-            if (g_clientConnectFlag == true) {
-                UART_printf("[Connected]\n\r");
-            } else {
-                UART_printf("[Disconnected]\n\r");
-            }
+            wifiDisplaySettings();
             break;
         case WIFI_cset: // Change WIFI settings
-            if (qMsgRecv.param == WIFI_cfg_ssid) {
-                //UART_printf("ssid = pcbuf = %s\n\r", qMsgRecv.pcbuf);
-                strcpy((char *)WifiSetup_CB.ssid, qMsgRecv.pcbuf);
-            } else if (qMsgRecv.param == WIFI_cfg_key) {
-                //UART_printf("key = pcbuf = %s\n\r", qMsgRecv.pcbuf);
-                strcpy((char *)WifiSetup_CB.key, qMsgRecv.pcbuf);
-            } else if (qMsgRecv.param == WIFI_cfg_wpa2) {
-                WifiSetup_CB.security = SL_WLAN_SEC_TYPE_WPA_WPA2;
-            } else if (qMsgRecv.param == WIFI_cfg_open) {
-                WifiSetup_CB.security = SL_WLAN_SEC_TYPE_OPEN;
-                memset(&WifiSetup_CB.key[0], 0, sizeof(WifiSetup_CB.key));
-            }
+            wifiChangeSettings(qMsgRecv.param, qMsgRecv.pcbuf);
             break;
         case WIFI_conn: // Connect to WIFI
-            if (g_wifiConnectFlag == true) {
-                UART_printf("WIFI already connected\n\r");
-                break;
-            }
-
-            if (g_wifiMode == ROLE_STA) {
-                LocalTime_connect();
-                g_wifiConnectFlag = (LOCALTIME_IS_IP_ACQUIRED(LocalTime_CB.status));
-            }
-            else if(g_wifiMode == ROLE_AP)
-            {
-                sl_Memset(ssid,0,33);
-                sl_WlanGet(SL_WLAN_CFG_AP_ID, &config_opt, &len, ssid);
-                UART_printf("AP mode SSID %s\n\r",ssid);
-            }
+            wifiConnectStandard();
             break;
         case WIFI_utim: // Update device time to UTC time
             status = ClockSync_update(); // Redundant, ClockSync_get() updates
             if (status == 0) {
                 g_timeAcquiredFlag = true;
+                setStatus(appStatus, STATUS_TIME_SET, true);
                 UART_printf("Time updated\n\r");
             } else if (status == CLOCKSYNC_ERROR_INTERVAL) {
                 UART_printf("Minimum time between updates did not elapse\n\r");
@@ -357,6 +301,7 @@ int wifiManager(unsigned int cmd)
             status = ClockSync_get(&netTime);
             if ((status == 0) || (status == CLOCKSYNC_ERROR_INTERVAL)) {
                 g_timeAcquiredFlag = true;
+                setStatus(appStatus, STATUS_TIME_SET, true);
                 UART_printf("UTC time = %s\r",asctime(&netTime));
             } else {
                 UART_printf("Error = %d\n\r",status);
@@ -367,6 +312,7 @@ int wifiManager(unsigned int cmd)
             if ((status == 0) || (status == CLOCKSYNC_ERROR_INTERVAL)) {
                 /* Semaphores should be created to protect these global variables */
                 g_timeAcquiredFlag = true;
+                setStatus(appStatus, STATUS_TIME_SET, true);
 
                 /* Get measurement data from I2C task */
                 taskENTER_CRITICAL();
@@ -405,10 +351,12 @@ int wifiManager(unsigned int cmd)
 
             if (send_status == -1) {
                 g_clientConnectFlag = false;
+                setStatus(appStatus, STATUS_TCP_CONNECT, false);
                 UART_printf("ERROR TCP Client could not connect to server [sockID=%d]\n\r",
                             PowerMeasure_appData.sockID);
             } else if (send_status == 0) {
                 g_clientConnectFlag = false;
+                setStatus(appStatus, STATUS_TCP_CONNECT, false);
                 UART_printf("ERROR Server stopped responding [sockID=%d]\n\r",
                             PowerMeasure_appData.sockID);
                 UART_printf("TCP Client timed out and closed socket [sockID=%d]\n\r",
@@ -416,6 +364,7 @@ int wifiManager(unsigned int cmd)
                 PowerMeasure_appData.sockID = OPEN_SOCK_ONCE;
             } else if (send_status == SERVER_FRAME_LENGTH) {
                 g_clientConnectFlag = true;
+                setStatus(appStatus, STATUS_TCP_CONNECT, true);
                 UART_printf("TCP Client sent message to server [sockID=%d]\n\r",
                             PowerMeasure_appData.sockID);
             }
@@ -473,6 +422,7 @@ int wifiManager(unsigned int cmd)
                 status = sl_Close(PowerMeasure_appData.sockID);
                 PowerMeasure_appData.sockID = OPEN_SOCK_ONCE;
                 g_clientConnectFlag = false;
+                setStatus(appStatus, STATUS_TCP_CONNECT, false);
             } else {
                 UART_printf("No TCP Client socket to close\r\n");
             }
@@ -784,6 +734,102 @@ void LocalTime_connect(void)
     }
 }
 
+/*
+ *  ======== wifiDisplaySettings ========
+ *  Display Wifi settings and connection status
+ *  param - Void
+ *  return - Void
+ */
+void wifiDisplaySettings(void)
+{
+    UART_printf("WIFI Name = %s\n\r", WifiSetup_CB.ssid);
+    if (WifiSetup_CB.security == SL_WLAN_SEC_TYPE_WPA_WPA2) {
+        UART_printf("Security Type = WPA2\n\r");
+        UART_printf("Password = %s\n\r", WifiSetup_CB.key);
+    } else if (WifiSetup_CB.security == SL_WLAN_SEC_TYPE_OPEN) {
+        UART_printf("Security type = OPEN\n\r");
+        UART_printf("No password for public/open WIFI\n\r");
+    }
+
+    UART_printf("External TCP Server Settings:\n\r");
+    UART_printf("IP Address = %d.%d.%d.%d\n\r",
+                (uint8_t)SL_IPV4_BYTE(PowerMeasure_appData.ipAddr,3),
+                (uint8_t)SL_IPV4_BYTE(PowerMeasure_appData.ipAddr,2),
+                (uint8_t)SL_IPV4_BYTE(PowerMeasure_appData.ipAddr,1),
+                (uint8_t)SL_IPV4_BYTE(PowerMeasure_appData.ipAddr,0));
+    UART_printf("Port = %d\n\r", PowerMeasure_appData.port);
+
+    UART_printf("WIFI Activity Status:\n\r");
+    UART_printf("WIFI ");
+    if (g_wifiConnectFlag == true) {
+        UART_printf("[Connected]\n\r");
+    } else {
+        UART_printf("[Disconnected]\n\r");
+    }
+    UART_printf("Time ");
+    if (g_timeAcquiredFlag == true) {
+        UART_printf("[Acquired]\n\r");
+    } else {
+        UART_printf("[Not Acquired]\n\r");
+    }
+    UART_printf("TCP Client ");
+    if (g_clientConnectFlag == true) {
+        UART_printf("[Connected]\n\r");
+    } else {
+        UART_printf("[Disconnected]\n\r");
+    }
+}
+
+/*
+ *  ======== wifiChangeSettings ========
+ *  Change Wifi settings such as SSID, security type, or password
+ *  config - Wifi configuration mode
+ *  pcBuf - Pointer to string buffer containing SSID or password
+ *  return - Void
+ */
+void wifiChangeSettings(int32_t config, char *pcBuf)
+{
+    if (config == WIFI_cfg_ssid) {
+        //UART_printf("ssid = pcbuf = %s\n\r", pcBuf);
+        strcpy((char *)WifiSetup_CB.ssid, pcBuf);
+    } else if (config == WIFI_cfg_key) {
+        //UART_printf("key = pcbuf = %s\n\r", pcBuf);
+        strcpy((char *)WifiSetup_CB.key, pcBuf);
+    } else if (config == WIFI_cfg_wpa2) {
+        WifiSetup_CB.security = SL_WLAN_SEC_TYPE_WPA_WPA2;
+    } else if (config == WIFI_cfg_open) {
+        WifiSetup_CB.security = SL_WLAN_SEC_TYPE_OPEN;
+        memset(&WifiSetup_CB.key[0], 0, sizeof(WifiSetup_CB.key));
+    }
+}
+
+/*
+ *  ======== wifiConnectStandard ========
+ *  Attempt to connect to Wifi with current settings
+ *  param - Void
+ *  return - Void
+ */
+void wifiConnectStandard(void)
+{
+    uint8_t ssid[33];           // Used for WIFI connection
+    uint16_t len = 33;          // Used for WIFI connection
+    uint16_t config_opt = SL_WLAN_AP_OPT_SSID;  // Used for WIFI connection
+
+    if (g_wifiConnectFlag == true) {
+        UART_printf("WIFI already connected\n\r");
+    }
+    else if (g_wifiMode == ROLE_STA) {
+        LocalTime_connect();
+        g_wifiConnectFlag = (LOCALTIME_IS_IP_ACQUIRED(LocalTime_CB.status));
+        setStatus(appStatus, STATUS_WIFI_CONNECT, true);
+    }
+    else if (g_wifiMode == ROLE_AP) {
+        sl_Memset(ssid,0,33);
+        sl_WlanGet(SL_WLAN_CFG_AP_ID, &config_opt, &len, ssid);
+        UART_printf("AP mode SSID %s\n\r",ssid);
+    }
+}
+
 //*****************************************************************************
 //
 //! \brief  This function prepares the Data Frame & initializes the
@@ -947,7 +993,10 @@ int32_t bsdCustomTcpClient(uint16_t port, int16_t sid, int16_t msg_type)
 }
 
 /*
- * Receive message header
+ *  ======== recvTcpClient ========
+ *  Receive and interpret message header
+ *  sid - Socket ID
+ *  return - status
  */
 int32_t recvTcpClient(int16_t sid)
 {
@@ -990,7 +1039,11 @@ int32_t recvTcpClient(int16_t sid)
 }
 
 /*
- * Receive type 1 message (text)
+ *  ======== recvT1Msg ========
+ *  Receive type 1 message (text)
+ *  sid - Socket ID
+ *  msg_len - Message length
+ *  return - Status
  */
 int32_t recvT1Msg(int16_t sid, uint32_t msg_len) {
     int16_t status = -1;
@@ -1016,7 +1069,11 @@ int32_t recvT1Msg(int16_t sid, uint32_t msg_len) {
 }
 
 /*
- * Receive type 2 message (numeric)
+ *  ======== recvT2Msg ========
+ *  Receive type 2 message (numeric)
+ *  sid - Socket ID
+ *  msg_len - Message length
+ *  return - Status
  */
 int32_t recvT2Msg(int16_t sid, uint32_t msg_len) {
     int16_t status = -1;

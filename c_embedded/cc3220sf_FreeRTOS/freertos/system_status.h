@@ -4,12 +4,12 @@
 #define MAX_STATUS_WORDS    (2)
 
 typedef enum {
-    STATUS_BIT_00 = 0,  //
-    STATUS_BIT_01,      //
-    STATUS_BIT_02,      //
-    STATUS_BIT_03,      //
-    STATUS_BIT_04,      //
-    STATUS_BIT_05,      //
+    STATUS_UART_INIT = 0,   //
+    STATUS_I2C_INIT,        //
+    STATUS_WIFI_INIT,       //
+    STATUS_WIFI_CONNECT,    //
+    STATUS_TIME_SET,        //
+    STATUS_TCP_CONNECT,     //
     STATUS_BIT_06,      //
     STATUS_BIT_07,      //
     STATUS_BIT_08,      //
