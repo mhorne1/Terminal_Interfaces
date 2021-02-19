@@ -152,9 +152,12 @@ int wifiManager( unsigned int cmd );
 void wifiDisplaySettings(void);
 void wifiChangeSettings(int32_t config, char *pcBuf);
 void wifiConnectStandard(void);
+void wifiBasicMessage(void);
 int32_t recvTcpClient(int16_t sid);
 int32_t recvT1Msg(int16_t sid, uint32_t msg_len);
 int32_t recvT2Msg(int16_t sid, uint32_t msg_len);
+void prepareT1Msg(void);
+void prepareT2Msg(void);
 float fl_htonl(float value);
 float fl_ntohl(float value);
 
@@ -255,13 +258,7 @@ int wifiManager(unsigned int cmd)
     int32_t status = -1;        // Function return value
     int32_t send_status = 0;    // Function return value for TCP Client
     int32_t recv_status = 0;    // Function return value for TCP Client
-    float outTempC;             // Temperature value in Celsius
-    float outTempF;             // Temperature value in Fahrenheit
-    int8_t outxVal;             // Accelerometer X-axis value
-    int8_t outyVal;             // Accelerometer Y-axis value
-    int8_t outzVal;             // Accelerometer Z-axis value
     struct tm netTime;          // Acquired time value
-    char *timeString;           // Pointer to string converted from time value
 
     if (g_wifiConnectFlag == false) {
         if (cmd > WIFI_conn) {
@@ -308,36 +305,7 @@ int wifiManager(unsigned int cmd)
             }
             break;
         case WIFI_dmsg: // Display newly prepared message for TCP Client
-            status = ClockSync_get(&netTime);
-            if ((status == 0) || (status == CLOCKSYNC_ERROR_INTERVAL)) {
-                /* Semaphores should be created to protect these global variables */
-                g_timeAcquiredFlag = true;
-                setStatus(appStatus, STATUS_TIME_SET, true);
-
-                /* Get measurement data from I2C task */
-                taskENTER_CRITICAL();
-                outTempC = g_temperatureC;
-                outTempF = g_temperatureF;
-                outxVal = (int8_t)g_xVal;
-                outyVal = (int8_t)g_yVal;
-                outzVal = (int8_t)g_zVal;
-                taskEXIT_CRITICAL();
-
-                timeString = asctime(&netTime);         // Get string with date and time
-                timeString[strlen(timeString)-1] = 0;   // Remove newline char
-
-                g_clientSendFlag = true; // Allow copying of string to send buffer
-                /* TCP Client ASCII Message Format */
-                UART_printf("%s,%3.2f,%3.2f,%d,%d,%d\n\r",
-                               timeString,
-                               outTempC,
-                               outTempF,
-                               outxVal,
-                               outyVal,
-                               outzVal);
-                g_clientSendFlag = false; // Deny copying of string to send buffer
-                //UART_printf("frameData = %s",PowerMeasure_CB.frameData);
-            }
+            wifiBasicMessage();
             break;
         case WIFI_tcli: // Test sending TCP Client message
             send_status = -1;
@@ -378,28 +346,9 @@ int wifiManager(unsigned int cmd)
                              PowerMeasure_appData.ipAddr);
 
             if (qMsgRecv.param == WIFI_msg_type1) {
-                /* Convert message size from host byte order to network byte order */
-                ClientMsg_appData.header.msg_len = sl_Htonl(FRAME_LENGTH);
-                /* Convert message type from host byte order to network byte order */
-                ClientMsg_appData.header.msg_type = sl_Htonl(WIFI_msg_type1);
-                /* Convert message number from host byte order to network byte order */
-                ClientMsg_appData.header.msg_number = sl_Htonl(g_message_number);
+                prepareT1Msg();
             } else if (qMsgRecv.param == WIFI_msg_type2) {
-                /* Convert message size from host byte order to network byte order */
-                T2Msg_appData.header.msg_len = sl_Htonl(sizeof(T2Msg_ControlBlock));
-                /* Convert message type from host byte order to network byte order */
-                T2Msg_appData.header.msg_type = sl_Htonl(WIFI_msg_type2);
-                /* Convert message number from host byte order to network byte order */
-                T2Msg_appData.header.msg_number = sl_Htonl(g_message_number);
-
-                T2Msg_appData.body.var_a = sl_Htonl(10);
-                T2Msg_appData.body.var_b = sl_Htonl(20);
-                T2Msg_appData.body.var_c = sl_Htonl(30);
-                T2Msg_appData.body.var_d = sl_Htonl(40);
-                T2Msg_appData.body.var_e = fl_htonl(50.1);
-                T2Msg_appData.body.var_f = fl_htonl(60.2);
-                T2Msg_appData.body.var_g = fl_htonl(70.3);
-                T2Msg_appData.body.var_h = fl_htonl(80.4);
+                prepareT2Msg();
             }
 
             /* Send new client message */
@@ -830,6 +779,54 @@ void wifiConnectStandard(void)
     }
 }
 
+/*
+ *  ======== wifiBasicMessage ========
+ *  Prepare TCP Client ASCII message type
+ *  param - Void
+ *  return - Void
+ */
+void wifiBasicMessage(void)
+{
+    int32_t status = -1;        // Function return value
+    float outTempC;             // Temperature value in Celsius
+    float outTempF;             // Temperature value in Fahrenheit
+    int8_t outxVal;             // Accelerometer X-axis value
+    int8_t outyVal;             // Accelerometer Y-axis value
+    int8_t outzVal;             // Accelerometer Z-axis value
+    struct tm netTime;          // Acquired time value
+    char *timeString;           // Pointer to string converted from time value
+
+    status = ClockSync_get(&netTime);
+    if ((status == 0) || (status == CLOCKSYNC_ERROR_INTERVAL)) {
+        /* Semaphores should be created to protect these global variables */
+        g_timeAcquiredFlag = true;
+        setStatus(appStatus, STATUS_TIME_SET, true);
+
+        /* Get measurement data from I2C task */
+        taskENTER_CRITICAL();
+        outTempC = g_temperatureC;
+        outTempF = g_temperatureF;
+        outxVal = (int8_t)g_xVal;
+        outyVal = (int8_t)g_yVal;
+        outzVal = (int8_t)g_zVal;
+        taskEXIT_CRITICAL();
+
+        timeString = asctime(&netTime);         // Get string with date and time
+        timeString[strlen(timeString)-1] = 0;   // Remove newline char
+
+        g_clientSendFlag = true; // Allow copying of string to send buffer
+        /* TCP Client ASCII Message Format */
+        UART_printf("%s,%3.2f,%3.2f,%d,%d,%d\n\r",
+                    timeString,
+                    outTempC,
+                    outTempF,
+                    outxVal,
+                    outyVal,
+                    outzVal);
+        g_clientSendFlag = false; // Deny copying of string to send buffer
+    }
+}
+
 //*****************************************************************************
 //
 //! \brief  This function prepares the Data Frame & initializes the
@@ -1099,6 +1096,45 @@ int32_t recvT2Msg(int16_t sid, uint32_t msg_len) {
     }
 
     return status;
+}
+
+/*
+ *  ======== prepareT1Msg ========
+ *  Prepare type 1 message header
+ *  param - Void
+ *  return - Void
+ */
+void prepareT1Msg(void) {
+    /* Convert message size from host byte order to network byte order */
+    ClientMsg_appData.header.msg_len = sl_Htonl(FRAME_LENGTH);
+    /* Convert message type from host byte order to network byte order */
+    ClientMsg_appData.header.msg_type = sl_Htonl(WIFI_msg_type1);
+    /* Convert message number from host byte order to network byte order */
+    ClientMsg_appData.header.msg_number = sl_Htonl(g_message_number);
+}
+
+/*
+ *  ======== prepareT2Msg ========
+ *  Prepare type 2 message header and body
+ *  param - Void
+ *  return - Void
+ */
+void prepareT2Msg(void) {
+    /* Convert message size from host byte order to network byte order */
+    T2Msg_appData.header.msg_len = sl_Htonl(sizeof(T2Msg_ControlBlock));
+    /* Convert message type from host byte order to network byte order */
+    T2Msg_appData.header.msg_type = sl_Htonl(WIFI_msg_type2);
+    /* Convert message number from host byte order to network byte order */
+    T2Msg_appData.header.msg_number = sl_Htonl(g_message_number);
+
+    T2Msg_appData.body.var_a = sl_Htonl(10);
+    T2Msg_appData.body.var_b = sl_Htonl(20);
+    T2Msg_appData.body.var_c = sl_Htonl(30);
+    T2Msg_appData.body.var_d = sl_Htonl(40);
+    T2Msg_appData.body.var_e = fl_htonl(50.1);
+    T2Msg_appData.body.var_f = fl_htonl(60.2);
+    T2Msg_appData.body.var_g = fl_htonl(70.3);
+    T2Msg_appData.body.var_h = fl_htonl(80.4);
 }
 
 /*
