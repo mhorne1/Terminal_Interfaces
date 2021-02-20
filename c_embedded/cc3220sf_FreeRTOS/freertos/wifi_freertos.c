@@ -158,6 +158,7 @@ int32_t recvT1Msg(int16_t sid, uint32_t msg_len);
 int32_t recvT2Msg(int16_t sid, uint32_t msg_len);
 void prepareT1Msg(void);
 void prepareT2Msg(void);
+void prepareOmnibusMsg(void);
 float fl_htonl(float value);
 float fl_ntohl(float value);
 
@@ -363,6 +364,13 @@ int wifiManager(unsigned int cmd)
             if (recv_status <= 0) {
                 UART_printf("Failed to receive server message\n\r");
             }
+            break;
+        case WIFI_omsg: // Test sending omnibus message to TCP Server
+            UART_printf("Sending omnibus message\n\r");
+            g_message_number += 1; // Increment client message number
+
+            prepareOmnibusMsg();
+
             break;
         case WIFI_csid: // Close TCP Client socket ID
             if (PowerMeasure_appData.sockID != OPEN_SOCK_ONCE) {
@@ -1135,6 +1143,33 @@ void prepareT2Msg(void) {
     T2Msg_appData.body.var_f = fl_htonl(60.2);
     T2Msg_appData.body.var_g = fl_htonl(70.3);
     T2Msg_appData.body.var_h = fl_htonl(80.4);
+}
+
+/*
+ *  ======== prepareOmnibusMsg ========
+ *  Prepare omnibus message header and body
+ *  param - Void
+ *  return - Void
+ */
+void prepareOmnibusMsg(void) {
+    uint64_t uptimeRTC;
+    int32_t status = -1;        // Function return value
+    struct tm netTime;          // Acquired time value
+    time_t secTime;             // Time value in seconds
+
+    uptimeRTC = ClockSync_getRTC();
+
+    UART_printf("uptimeRTC == %u\n\r",
+                (uint32_t) uptimeRTC);
+
+    status = ClockSync_get(&netTime);
+    if ((status == 0) || (status == CLOCKSYNC_ERROR_INTERVAL)) {
+        g_timeAcquiredFlag = true;
+        secTime = mktime(&netTime);
+
+        UART_printf("secTime == %u\n\r",
+                    secTime);
+    }
 }
 
 /*

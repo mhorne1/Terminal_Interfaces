@@ -31,6 +31,7 @@ typedef enum
     WIFI_conn,      // Connect to WIFI
     WIFI_cmsg,      // Send client message to server, requires WIFI connection
     WIFI_rmsg,      // Receive message from server, requires WIFI connection
+    WIFI_omsg,      // Send omnibus message to TCP Server, requires WIFI connection
     WIFI_utim,      // Update device time, requires WIFI connection, redundant with ClockSync_get()
     WIFI_dtim,      // Display device time (UTC), requires WIFI connection
     WIFI_dmsg,      // Display TCP Client message, requires WIFI connection
@@ -54,6 +55,7 @@ typedef enum
     WIFI_msg_type1 = 1,     // Text
     WIFI_msg_type2,         // Numeric
     WIFI_msg_type3,         // Acknowledge
+    WIFI_msg_omnibus = 50,  // System status and measurements
     WIFI_msg_last,          // Unused
 }WIFIMessageTypes;
 

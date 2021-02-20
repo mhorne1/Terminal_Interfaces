@@ -95,6 +95,7 @@ const char helpPrompt[]     = "Valid Commands\r\n"                  \
                               "9: Send TCP Client message\r\n"      \
                               "z: Send new TCP message\r\n"         \
                               "x: Receive new TCP message\r\n"      \
+                              "o: Test sending omnibus message\r\n" \
                               "b: Test status bits\r\n"             \
                               "--------------\r\n"                  \
                               "m: Display current memory heap\r\n"  \
@@ -245,6 +246,10 @@ void simpleConsole(UART_Handle uart)
                 qMsgSend.header = WIFI_rmsg;
                 xQueueSendToBack( xQueue1, &qMsgSend, 0 );
                 break;
+            case 'o': // Test sending omnibus message to TCP Server
+                qMsgSend.header = WIFI_omsg;
+                xQueueSendToBack( xQueue1, &qMsgSend, 0 );
+                break;
             case 'b': // Set status bit
                 testStatusBits(&cmd);
                 break;
@@ -277,7 +282,7 @@ void simpleConsole(UART_Handle uart)
                 } else {
                     UART_printf("Stopped ");
                 }
-                UART_printf("automatically sending TCP Client messages\n\r");
+                UART_printf("Automatically sending TCP Client messages\n\r");
                 break;
             case 'h':
             default:

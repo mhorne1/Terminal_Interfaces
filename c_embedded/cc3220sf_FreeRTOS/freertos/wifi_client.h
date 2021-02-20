@@ -11,6 +11,10 @@
 #define ALWAYS_OPEN_SOCK            (-1)
 #define OPEN_SOCK_ONCE              (-2)
 
+#define STATUS_WORDS                (2)
+#define TEMPER_VALUES               (2)
+#define ACCEL_VALUES                (4)
+
 typedef enum
 {
     SocketType_UDP,
@@ -123,6 +127,33 @@ typedef struct _ClientT2Msg_ControlBlock_t_
 }ClientT2Msg_ControlBlock;
 
 
+/* Omnibus message body control block definition */
+typedef struct _OmnibusMsg_Body_t_
+{
+    /* Omnibus message */
+    uint32_t        uptime;
+    uint32_t        datetime;
+    uint32_t        var_a;
+    uint32_t        status[STATUS_WORDS];
+    uint32_t        var_b;
+    int16_t         temp_c[TEMPER_VALUES];
+    int8_t          accel[ACCEL_VALUES];
+    uint32_t        var_c;
+    uint32_t        var_d;
+    uint32_t        var_e;
+    uint32_t        var_f;
+    uint32_t        var_g;
+    uint32_t        var_h;
+}OmnibusMsg_Body;
+
+/* Full Omnibus message control block definition */
+typedef struct _OmnibusMsg_ControlBlock_t_
+{
+    /* Standardized message header */
+    ClientHeader_ControlBlock       header;
+    /* Message body */
+    OmnibusMsg_Body                 body;
+}OmnibusMsg_ControlBlock;
 
 //****************************************************************************
 //                          FUNCTION PROTOTYPES
