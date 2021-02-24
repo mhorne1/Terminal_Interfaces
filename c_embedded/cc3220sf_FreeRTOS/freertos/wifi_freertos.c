@@ -98,7 +98,7 @@ PowerMeasure_AppData    PowerMeasure_appData = {
 /* Struct containing server address info and send buffer */
 PowerMeasure_ControlBlock   PowerMeasure_CB;
 
-/* Struct containing socket configuration for TCP Client */
+/* Struct containing default Type 1 Message */
 ClientMsg_ControlBlock    ClientMsg_appData = {
     .header.msg_len = FRAME_LENGTH,     // 80 bytes for text
     .header.msg_type = WIFI_msg_type1,  // 1 for text
@@ -106,7 +106,7 @@ ClientMsg_ControlBlock    ClientMsg_appData = {
     .body.message = DEFAULT_MESSAGE,    // Client message
 };
 
-/* Struct containing socket configuration for TCP Client */
+/* Struct containing default Type 2 Message */
 ClientT2Msg_ControlBlock    T2Msg_appData = {
     .header.msg_len = sizeof(T2Msg_ControlBlock),   // 80 bytes for text
     .header.msg_type = WIFI_msg_type2,  // 2 for numeric
@@ -120,6 +120,9 @@ ClientT2Msg_ControlBlock    T2Msg_appData = {
     .body.var_g = 70.3,                 // float
     .body.var_h = 80.4,                 // float
 };
+
+/* Struct containing omnibus status message*/
+OmnibusMsg_Block   appOmnibus;
 
 /* Semaphores should be created to protect these global variables */
 
@@ -161,6 +164,7 @@ void prepareT2Msg(void);
 void prepareOmnibusMsg(void);
 float fl_htonl(float value);
 float fl_ntohl(float value);
+uint64_t ll_htonl(uint64_t value);
 
 //****************************************************************************
 //                          EXTERNAL FUNCTIONS
@@ -1157,10 +1161,18 @@ void prepareOmnibusMsg(void) {
     struct tm netTime;          // Acquired time value
     time_t secTime;             // Time value in seconds
 
+    /* Convert from host byte order to network byte order */
+    appOmnibus.header.msg_len = sl_Htonl(sizeof(OmnibusMsg_Body));
+    appOmnibus.header.msg_type = sl_Htonl(WIFI_msg_omnibus);
+    appOmnibus.header.msg_number = sl_Htonl(g_message_number);
+
     uptimeRTC = ClockSync_getRTC();
 
     UART_printf("uptimeRTC == %u\n\r",
                 (uint32_t) uptimeRTC);
+
+    /* Convert uptime */
+    appOmnibus.body.uptime = ll_htonl(uptimeRTC);
 
     status = ClockSync_get(&netTime);
     if ((status == 0) || (status == CLOCKSYNC_ERROR_INTERVAL)) {
@@ -1169,7 +1181,16 @@ void prepareOmnibusMsg(void) {
 
         UART_printf("secTime == %u\n\r",
                     secTime);
+
+        /* Convert datetime */
+        appOmnibus.body.uptime = sl_Htonl(secTime);
     }
+
+    /* Copy status bits */
+    memcpy(&appOmnibus.body.status, &appStatus, sizeof(appStatus));
+    /* Convert status bits */
+    appOmnibus.body.status[0] = sl_Htonl(appOmnibus.body.status[0]);
+    appOmnibus.body.status[1] = sl_Htonl(appOmnibus.body.status[1]);
 }
 
 /*
@@ -1208,6 +1229,26 @@ float fl_ntohl(float value)
     val.i = sl_Ntohl (val.i);
 
     return val.f;
+}
+
+/*
+ * All credit to:
+ * https://cboard.cprogramming.com/c-programming/121572-how-swap-endianness-float.html
+ */
+uint64_t ll_htonl(uint64_t value)
+{
+    union v {
+        uint64_t        x;
+        uint32_t        i[2];
+    };
+
+    union v val;
+
+    val.x = value;
+    val.i[0] = sl_Htonl(val.i[0]);
+    val.i[1] = sl_Htonl(val.i[1]);
+
+    return val.x;
 }
 
 //*****************************************************************************

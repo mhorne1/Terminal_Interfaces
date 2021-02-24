@@ -131,7 +131,7 @@ typedef struct _ClientT2Msg_ControlBlock_t_
 typedef struct _OmnibusMsg_Body_t_
 {
     /* Omnibus message */
-    uint32_t        uptime;
+    uint64_t        uptime;
     uint32_t        datetime;
     uint32_t        var_a;
     uint32_t        status[STATUS_WORDS];
@@ -147,13 +147,13 @@ typedef struct _OmnibusMsg_Body_t_
 }OmnibusMsg_Body;
 
 /* Full Omnibus message control block definition */
-typedef struct _OmnibusMsg_ControlBlock_t_
+typedef struct _OmnibusMsg_Block_t_
 {
     /* Standardized message header */
     ClientHeader_ControlBlock       header;
     /* Message body */
     OmnibusMsg_Body                 body;
-}OmnibusMsg_ControlBlock;
+}OmnibusMsg_Block;
 
 //****************************************************************************
 //                          FUNCTION PROTOTYPES
