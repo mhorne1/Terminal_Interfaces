@@ -120,6 +120,28 @@ def msg_type3_pack(length, pack_message, message):
     else:
         return struct.unpack(STRUCT_FORMAT, message)
 
+def msg_omnibus_pack(length, pack_message, message):
+    '''
+    Packs or unpacks omnibus telemetry messages
+    Parameters
+    ----------
+    length: Number of bytes that comprise the message
+    pack_message : True or False
+    message : Tuple (1 uint64, 5 uint32...), or byte encoded tuple
+    Returns
+    -------
+    Network (big-endian) byte encoded tuple, or tuple
+    '''
+    STRUCT_FORMAT = "!1Q5I2h4b6I"
+    if (length != -1) and (length != struct.calcsize(STRUCT_FORMAT)):
+        print("Specified message length incompatible with message type 3")
+        return b""
+    
+    if pack_message == True:
+        return struct.pack(STRUCT_FORMAT, *message)
+    else:
+        return struct.unpack(STRUCT_FORMAT, message)
+    
 def get_datetime_name():
     '''
     Returns string with formatted timestamp and message string
@@ -309,4 +331,5 @@ msg_dict = { # Dispatch table containing message types and corresponding functio
     1 : msg_type1_pack,
     2 : msg_type2_pack,
     3 : msg_type3_pack,
+    50 : msg_omnibus_pack,
 }
