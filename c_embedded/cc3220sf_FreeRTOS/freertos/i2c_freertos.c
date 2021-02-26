@@ -66,10 +66,12 @@
 // GLOBAL VARIABLES
 //****************************************************************************
 /* Temperature written by the I2C thread and read by console thread */
+volatile int16_t g_appTempC[MAX_TEMPER_VALUES];
 volatile float g_temperatureC;
 volatile float g_temperatureF;
 
 /* Accelerometer values written by the I2C thread and read by console thread */
+volatile int8_t g_appAccel[MAX_ACCEL_VALUES];
 volatile int8_t g_xVal;
 volatile int8_t g_yVal;
 volatile int8_t g_zVal;
@@ -151,7 +153,7 @@ void i2cTask(void *pvParameters)
         }
     }
 
-    setStatus(appStatus, STATUS_I2C_INIT, true);
+    setStatus(g_appStatus, STATUS_I2C_INIT, true);
 
     lastWake = xTaskGetTickCount(); // Set starting point for task timing
 
@@ -164,8 +166,8 @@ void i2cTask(void *pvParameters)
              *  Semaphores should be created to protect these global variables
              */
             taskENTER_CRITICAL();
-            g_temperatureC = (rxBuffer[0] << 6) | (rxBuffer[1] >> 2);
-            g_temperatureC *= 0.03125;
+            g_appTempC[0] = (rxBuffer[0] << 6) | (rxBuffer[1] >> 2);
+            g_temperatureC = g_appTempC[0] * 0.03125;
             g_temperatureF = g_temperatureC * 9 / 5 + 32;
             taskEXIT_CRITICAL();
 
@@ -254,6 +256,9 @@ uint8_t accelerometerReading(I2C_Handle i2cHandle)
     {
         /* Semaphores should be created to protect these global variables */
         taskENTER_CRITICAL();
+        g_appAccel[0] = xValRead;
+        g_appAccel[1] = yValRead;
+        g_appAccel[2] = zValRead;
         g_xVal = xValRead;
         g_yVal = yValRead;
         g_zVal = zValRead;

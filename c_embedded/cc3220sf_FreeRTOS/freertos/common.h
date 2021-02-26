@@ -9,6 +9,10 @@
 #define PROJECT_QUEUE_LENGTH    (3)
 #define PROJECT_BF_FLAGS        (0)
 
+#define PROJECT_STATUS_WORDS    (2)
+#define PROJECT_TEMPER_VALUES   (2)
+#define PROJECT_ACCEL_VALUES    (4)
+
 typedef enum
 {
     TPRI_uart = 1,              // Uart task priority

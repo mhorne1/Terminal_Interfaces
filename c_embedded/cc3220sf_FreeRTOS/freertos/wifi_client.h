@@ -11,9 +11,9 @@
 #define ALWAYS_OPEN_SOCK            (-1)
 #define OPEN_SOCK_ONCE              (-2)
 
-#define STATUS_WORDS                (2)
-#define TEMPER_VALUES               (2)
-#define ACCEL_VALUES                (4)
+#define STATUS_WORDS                PROJECT_STATUS_WORDS
+#define TEMPER_VALUES               PROJECT_TEMPER_VALUES
+#define ACCEL_VALUES                PROJECT_ACCEL_VALUES
 
 typedef enum
 {

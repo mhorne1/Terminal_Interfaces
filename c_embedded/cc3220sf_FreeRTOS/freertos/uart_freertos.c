@@ -155,7 +155,7 @@ void uartTask(void *pvParameters)
             while (1);
         }
 
-        setStatus(appStatus, STATUS_UART_INIT, true);
+        setStatus(g_appStatus, STATUS_UART_INIT, true);
 
         simpleConsole(uart);    // Run command console
 
@@ -567,10 +567,10 @@ void testStatusBits(char *pcmd)
     UART_printf("Assert or Clear?\r\n");
     getChar(pcmd);
     if ((*pcmd=='A') || (*pcmd=='a')) {
-        setStatus(appStatus, tempVar, true);
+        setStatus(g_appStatus, tempVar, true);
     } else {
-        setStatus(appStatus, tempVar, false);
+        setStatus(g_appStatus, tempVar, false);
     }
-    UART_printf("appStatus[0] = 0x%08X\r\nappStatus[1] = 0x%08X\r\n",
-                appStatus[0], appStatus[1]);
+    UART_printf("g_appStatus[0] = 0x%08X\r\ng_appStatus[1] = 0x%08X\r\n",
+                g_appStatus[0], g_appStatus[1]);
 }

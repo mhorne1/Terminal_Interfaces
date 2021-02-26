@@ -1,7 +1,7 @@
 #ifndef SYSTEM_STATUS_H_
 #define SYSTEM_STATUS_H_
 
-#define MAX_STATUS_WORDS    (2)
+#define MAX_STATUS_WORDS    PROJECT_STATUS_WORDS
 
 typedef enum {
     STATUS_UART_INIT = 0,   //
@@ -72,7 +72,7 @@ typedef enum {
 }STATUSBITS;
 
 // Application Status Word Array
-extern uint32_t appStatus[MAX_STATUS_WORDS];
+extern uint32_t g_appStatus[MAX_STATUS_WORDS];
 
 //****************************************************************************
 //                          FUNCTION PROTOTYPES

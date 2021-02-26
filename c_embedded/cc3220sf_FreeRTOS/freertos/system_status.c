@@ -8,13 +8,19 @@
 
 #include <stdint.h>
 
+/* RTOS header files */
+#include <FreeRTOS.h>
+#include <task.h>
+#include <queue.h>
+
 /* Project header files */
+#include "freertos/common.h"
 #include "freertos/system_status.h"
 
 //****************************************************************************
 //                          GLOBAL VARIABLES
 //****************************************************************************
-uint32_t appStatus[MAX_STATUS_WORDS];
+uint32_t g_appStatus[MAX_STATUS_WORDS];
 
 /*
  *  ======== setStatus ========

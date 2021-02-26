@@ -229,7 +229,7 @@ void wifiTask(void *pvParameters)
 
     g_wifiMode = mode; // Store copy of WIFI mode
 
-    setStatus(appStatus, STATUS_WIFI_INIT, true);
+    setStatus(g_appStatus, STATUS_WIFI_INIT, true);
 
     while(1)
     {
@@ -291,7 +291,7 @@ int wifiManager(unsigned int cmd)
             status = ClockSync_update(); // Redundant, ClockSync_get() updates
             if (status == 0) {
                 g_timeAcquiredFlag = true;
-                setStatus(appStatus, STATUS_TIME_SET, true);
+                setStatus(g_appStatus, STATUS_TIME_SET, true);
                 UART_printf("Time updated\n\r");
             } else if (status == CLOCKSYNC_ERROR_INTERVAL) {
                 UART_printf("Minimum time between updates did not elapse\n\r");
@@ -303,7 +303,7 @@ int wifiManager(unsigned int cmd)
             status = ClockSync_get(&netTime);
             if ((status == 0) || (status == CLOCKSYNC_ERROR_INTERVAL)) {
                 g_timeAcquiredFlag = true;
-                setStatus(appStatus, STATUS_TIME_SET, true);
+                setStatus(g_appStatus, STATUS_TIME_SET, true);
                 UART_printf("UTC time = %s\r",asctime(&netTime));
             } else {
                 UART_printf("Error = %d\n\r",status);
@@ -324,12 +324,12 @@ int wifiManager(unsigned int cmd)
 
             if (send_status == -1) {
                 g_clientConnectFlag = false;
-                setStatus(appStatus, STATUS_TCP_CONNECT, false);
+                setStatus(g_appStatus, STATUS_TCP_CONNECT, false);
                 UART_printf("ERROR TCP Client could not connect to server [sockID=%d]\n\r",
                             PowerMeasure_appData.sockID);
             } else if (send_status == 0) {
                 g_clientConnectFlag = false;
-                setStatus(appStatus, STATUS_TCP_CONNECT, false);
+                setStatus(g_appStatus, STATUS_TCP_CONNECT, false);
                 UART_printf("ERROR Server stopped responding [sockID=%d]\n\r",
                             PowerMeasure_appData.sockID);
                 UART_printf("TCP Client timed out and closed socket [sockID=%d]\n\r",
@@ -337,7 +337,7 @@ int wifiManager(unsigned int cmd)
                 PowerMeasure_appData.sockID = OPEN_SOCK_ONCE;
             } else if (send_status == SERVER_FRAME_LENGTH) {
                 g_clientConnectFlag = true;
-                setStatus(appStatus, STATUS_TCP_CONNECT, true);
+                setStatus(g_appStatus, STATUS_TCP_CONNECT, true);
                 UART_printf("TCP Client sent message to server [sockID=%d]\n\r",
                             PowerMeasure_appData.sockID);
             }
@@ -383,7 +383,7 @@ int wifiManager(unsigned int cmd)
                 status = sl_Close(PowerMeasure_appData.sockID);
                 PowerMeasure_appData.sockID = OPEN_SOCK_ONCE;
                 g_clientConnectFlag = false;
-                setStatus(appStatus, STATUS_TCP_CONNECT, false);
+                setStatus(g_appStatus, STATUS_TCP_CONNECT, false);
             } else {
                 UART_printf("No TCP Client socket to close\r\n");
             }
@@ -782,7 +782,7 @@ void wifiConnectStandard(void)
     else if (g_wifiMode == ROLE_STA) {
         LocalTime_connect();
         g_wifiConnectFlag = (LOCALTIME_IS_IP_ACQUIRED(LocalTime_CB.status));
-        setStatus(appStatus, STATUS_WIFI_CONNECT, true);
+        setStatus(g_appStatus, STATUS_WIFI_CONNECT, true);
     }
     else if (g_wifiMode == ROLE_AP) {
         sl_Memset(ssid,0,33);
@@ -812,7 +812,7 @@ void wifiBasicMessage(void)
     if ((status == 0) || (status == CLOCKSYNC_ERROR_INTERVAL)) {
         /* Semaphores should be created to protect these global variables */
         g_timeAcquiredFlag = true;
-        setStatus(appStatus, STATUS_TIME_SET, true);
+        setStatus(g_appStatus, STATUS_TIME_SET, true);
 
         /* Get measurement data from I2C task */
         taskENTER_CRITICAL();
@@ -1160,6 +1160,7 @@ void prepareOmnibusMsg(void) {
     int32_t status = -1;        // Function return value
     struct tm netTime;          // Acquired time value
     time_t secTime;             // Time value in seconds
+    int32_t i;                  // Loop index
 
     /* Convert from host byte order to network byte order */
     appOmnibus.header.msg_len = sl_Htonl(sizeof(OmnibusMsg_Body));
@@ -1187,10 +1188,19 @@ void prepareOmnibusMsg(void) {
     }
 
     /* Copy status bits */
-    memcpy(&appOmnibus.body.status, &appStatus, sizeof(appStatus));
+    memcpy(&appOmnibus.body.status, &g_appStatus, sizeof(g_appStatus));
     /* Convert status bits */
-    appOmnibus.body.status[0] = sl_Htonl(appOmnibus.body.status[0]);
-    appOmnibus.body.status[1] = sl_Htonl(appOmnibus.body.status[1]);
+    for (i = 0; i < STATUS_WORDS; i++) {
+        appOmnibus.body.status[i] = sl_Htonl(appOmnibus.body.status[i]);
+    }
+
+    /* Copy temperature data */
+    for (i = 0; i < TEMPER_VALUES; i++) {
+        appOmnibus.body.temp_c[i] = sl_Htonl(g_appTempC[i]);
+    }
+
+    /* Copy accelerometer data */
+    memcpy(&appOmnibus.body.accel, &g_appAccel, sizeof(g_appAccel));
 }
 
 /*
