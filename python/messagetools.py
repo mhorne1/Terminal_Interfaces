@@ -68,7 +68,8 @@ def msg_type1_pack(length, pack_message, message):
     Byte encoded text string, or text string
     '''
     if (length != -1) and (length != len(message)):
-        print("Specified message length incompatible with message type 1")
+        print(f"Specified message length {length} incompatible with " + \
+        f"{struct.calcsize(STRUCT_FORMAT)} for message type 1")
         return b""
     
     if pack_message == True:
@@ -90,7 +91,8 @@ def msg_type2_pack(length, pack_message, message):
     '''
     STRUCT_FORMAT = "!4I4f"
     if (length != -1) and (length != struct.calcsize(STRUCT_FORMAT)):
-        print("Specified message length incompatible with message type 2")
+        print(f"Specified message length {length} incompatible with " + \
+        f"{struct.calcsize(STRUCT_FORMAT)} for message type 2")
         return b""
     
     if pack_message == True:
@@ -112,7 +114,8 @@ def msg_type3_pack(length, pack_message, message):
     '''
     STRUCT_FORMAT = "!2I1i1f"
     if (length != -1) and (length != struct.calcsize(STRUCT_FORMAT)):
-        print("Specified message length incompatible with message type 3")
+        print(f"Specified message length {length} incompatible with " + \
+        f"{struct.calcsize(STRUCT_FORMAT)} for message type 3")
         return b""
     
     if pack_message == True:
@@ -132,9 +135,10 @@ def msg_omnibus_pack(length, pack_message, message):
     -------
     Network (big-endian) byte encoded tuple, or tuple
     '''
-    STRUCT_FORMAT = "!1Q5I2h4b6I"
+    STRUCT_FORMAT = "!1Q5I2h4b7I"
     if (length != -1) and (length != struct.calcsize(STRUCT_FORMAT)):
-        print("Specified message length incompatible with message type 3")
+        print(f"Specified message length {length} incompatible with " + \
+        f"{struct.calcsize(STRUCT_FORMAT)} for message type Omnibus")
         return b""
     
     if pack_message == True:

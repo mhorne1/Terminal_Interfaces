@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2]:
+# In[1]:
 
 
 # "pyserver_01.py <port>"
@@ -67,12 +67,12 @@ msg = "Server Message: 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLM" +     
 msg_type = 1 # String message
 msg_t = (msg_type, msg) # Message tuple : (message_type, message)
 # Default omnibus telemetry message
-omni_tmp = (50,                       # msg_type
-            (11,                      # uptime
-             21, 22, 23, 24, 25,      # datetime, status
-             31, 32,                  # temperature
-             41, 42, 43, 44,          # accelerometer
-             51, 52, 53, 54, 55, 56)) # spares
+omni_tmp = (50,                               # msg_type
+            (11,                              # uptime
+             21, 22, 23, 24, 25,              # datetime, status
+             31, 32,                          # temperature
+             41, 42, 43, 44,                  # accelerometer
+             51, 52, 53, 54, 55, 56, 57))     # spares
 
 def server_thread(xhost, xport, xheaderformat, recvq, sendq, recordq):
     '''
@@ -229,7 +229,7 @@ while True:
                 #send_q.put((2,(10, 20, 30, 40, 50.12, 60.34, 70.56, 80.78)))
                 
                 # Send default omnibus telemetry message
-                send_q.put(omni_tmp)
+                #send_q.put(omni_tmp)
     except KeyboardInterrupt:
         serverevent.set()
         break
