@@ -85,7 +85,7 @@ const char helpPrompt[]     = "Valid Commands\r\n"                  \
                               "t: Display temperature data\r\n"     \
                               "a: Display accelerometer data\r\n"   \
                               "1: Display WIFI settings\r\n"        \
-                              "2: Change WIFI settings"             \
+                              "2: Change WIFI settings\r\n"         \
                               "3: Connect to WIFI\r\n"              \
                               "4: Update device time\r\n"           \
                               "5: Display device time (UTC)\r\n"    \

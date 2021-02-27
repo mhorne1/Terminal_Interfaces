@@ -156,6 +156,7 @@ void wifiDisplaySettings(void);
 void wifiChangeSettings(int32_t config, char *pcBuf);
 void wifiConnectStandard(void);
 void wifiBasicMessage(void);
+int32_t sendTcpClient(uint16_t port, int16_t sid, const void *buf, int16_t len);
 int32_t recvTcpClient(int16_t sid);
 int32_t recvT1Msg(int16_t sid, uint32_t msg_len);
 int32_t recvT2Msg(int16_t sid, uint32_t msg_len);
@@ -373,8 +374,15 @@ int wifiManager(unsigned int cmd)
             UART_printf("Sending omnibus message\n\r");
             g_message_number += 1; // Increment client message number
 
+            prepareDataFrame(PowerMeasure_appData.port,
+                             PowerMeasure_appData.ipAddr);
+
             prepareOmnibusMsg();
 
+            sendTcpClient(PowerMeasure_appData.port,
+                          PowerMeasure_appData.sockID,
+                          &appOmnibus,
+                          sizeof(OmnibusMsg_Block));
             break;
         case WIFI_csid: // Close TCP Client socket ID
             if (PowerMeasure_appData.sockID != OPEN_SOCK_ONCE) {
@@ -931,10 +939,11 @@ int32_t bsdTcpClient(uint16_t port, int16_t sid)
 
 //*****************************************************************************
 //
-//! \brief This function implements the modified TCP client .
+//! \brief This function implements the modified TCP client.
 //!
 //! \param Port - socket port number; Sid - socket id,
-//!        -ve if socket is already opened.
+//!        -ve if socket is already opened
+//!        msg_type - Specific type of message body
 //!
 //! \return 0 on success, -ve otherwise.
 //
@@ -998,6 +1007,67 @@ int32_t bsdCustomTcpClient(uint16_t port, int16_t sid, int16_t msg_type)
         PowerMeasure_appData.sockID = sockId;
     }
     //return(0);
+    return(status);
+}
+
+/*
+ *  ======== sendTcpClient ========
+ *  This function implements a generalized version of TCP client.
+ *  port - Socket port number
+ *  sid - Socket ID
+ *  pbuf - Pointer to object that will be sent
+ *  len - Object size in bytes
+ *  return - status
+ */
+int32_t sendTcpClient(uint16_t port, int16_t sid, const void *pbuf, int16_t len)
+{
+    int16_t         sockId;
+    int16_t         idx = 0;
+    int16_t         status = -1;
+
+    if (sid < 0) {
+        /* Need to open socket  */
+        sockId = sl_Socket(SL_AF_INET,SL_SOCK_STREAM, 0);
+        /* Make connection establishment */
+        status = sl_Connect(sockId,
+                            ( SlSockAddr_t *)&PowerMeasure_CB.ipV4Addr,
+                            sizeof(SlSockAddrIn_t));
+        /* Success: status = 0 */
+        /* Fail: status = -1 */
+        //UART_printf("status of sl_Connect = %d\n\r", status);
+        if (status < 0) {
+            sl_Close(sockId);
+        }
+    } else {
+        /* Socket is already opened */
+        sockId = sid;
+    }
+
+    while (idx < NUM_OF_PKT) {
+        status = sl_Send(sockId,
+                         pbuf,
+                         len,
+                         0);
+
+        /* Success: status = number of bytes sent */
+        /* Fail: status = -1 */
+        //UART_printf("status of sl_Send = %d\n\r", status);
+        if (status <= 0 ) {
+            status = sl_Close(sockId);
+            /* Success: status = 0 */
+            /* Fail: status = -1 */
+            //UART_printf("status of sl_Close = %d\n\r", status);
+        }
+        idx++;
+    }
+    if (sid == ALWAYS_OPEN_SOCK) {
+        /* Next time, use a new socket */
+        status = sl_Close(sockId);
+    } else {
+        /* store the current open socket id*/
+        PowerMeasure_appData.sockID = sockId;
+    }
+
     return(status);
 }
 
@@ -1173,7 +1243,8 @@ void prepareOmnibusMsg(void) {
                 (uint32_t) uptimeRTC);
 
     /* Convert uptime */
-    appOmnibus.body.uptime = ll_htonl(uptimeRTC);
+    appOmnibus.body.uptime[0] = sl_Htonl((uint32_t) (uptimeRTC >> 32));
+    appOmnibus.body.uptime[1] = sl_Htonl((uint32_t) uptimeRTC);
 
     status = ClockSync_get(&netTime);
     if ((status == 0) || (status == CLOCKSYNC_ERROR_INTERVAL)) {
@@ -1184,8 +1255,11 @@ void prepareOmnibusMsg(void) {
                     secTime);
 
         /* Convert datetime */
-        appOmnibus.body.uptime = sl_Htonl(secTime);
+        appOmnibus.body.datetime = sl_Htonl(secTime);
     }
+
+    /* Convert FreeRTOS metric */
+    appOmnibus.body.var_a = sl_Htonl((uint32_t) xTaskGetTickCount());
 
     /* Copy status bits */
     memcpy(&appOmnibus.body.status, &g_appStatus, sizeof(g_appStatus));
@@ -1196,7 +1270,7 @@ void prepareOmnibusMsg(void) {
 
     /* Copy temperature data */
     for (i = 0; i < TEMPER_VALUES; i++) {
-        appOmnibus.body.temp_c[i] = sl_Htonl(g_appTempC[i]);
+        appOmnibus.body.temp_c[i] = sl_Htons(g_appTempC[i]);
     }
 
     /* Copy accelerometer data */
