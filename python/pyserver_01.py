@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[2]:
 
 
 # "pyserver_01.py <port>"
@@ -175,7 +175,7 @@ def record_thread(rec_queue):
             msg = msg_t[1]
             if msg_type == 1:
                 mt.record_text(dir_name, mt.get_timestamp(msg))
-            elif msg_type == 2:
+            elif (msg_type == 2) or (msg_type == 50):
                 mt.record_csv(dir_name, msg)
         if serverevent.is_set(): # Check after recording message
             break
