@@ -96,7 +96,7 @@ int main(void)
                        "i2c_name",                        // pcName
                        I2CTASKSTACKSIZE,                  // usStackDepth
                        NULL,                              // pvParameters
-                       TPRI_wifi,                         // uxPriority
+                       TPRI_i2c,                          // uxPriority
                        &xTasks.i2cHandle);                // pxCreatedTask
     if (retc != pdPASS) {
         while (1); // xTaskCreate() failed
@@ -106,7 +106,7 @@ int main(void)
                        "wifi_name",                       // pcName
                        WIFITASKSTACKSIZE,                 // usStackDepth
                        NULL,                              // pvParameters
-                       TPRI_i2c,                          // uxPriority
+                       TPRI_wifi,                         // uxPriority
                        &xTasks.wifiHandle);               // pxCreatedTask
     if (retc != pdPASS) {
         while (1); // xTaskCreate() failed
