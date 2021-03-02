@@ -11,6 +11,7 @@
 #define ALWAYS_OPEN_SOCK            (-1)
 #define OPEN_SOCK_ONCE              (-2)
 
+#define UPTIME_WORDS                PROJECT_UPTIME_WORDS
 #define STATUS_WORDS                PROJECT_STATUS_WORDS
 #define TEMPER_VALUES               PROJECT_TEMPER_VALUES
 #define ACCEL_VALUES                PROJECT_ACCEL_VALUES
@@ -131,20 +132,20 @@ typedef struct _ClientT2Msg_ControlBlock_t_
 typedef struct _OmnibusMsg_Body_t_
 {
     /* Omnibus message */
-    uint32_t        uptime[STATUS_WORDS];
-    uint32_t        datetime;
-    uint32_t        var_a;
-    uint32_t        status[STATUS_WORDS];
-    uint32_t        var_b;
-    int16_t         temp_c[TEMPER_VALUES];
-    int8_t          accel[ACCEL_VALUES];
-    uint32_t        var_c;
-    uint32_t        var_d;
-    uint32_t        var_e;
-    uint32_t        var_f;
-    uint32_t        var_g;
-    uint32_t        var_h;
-    uint32_t        var_i;
+    uint32_t        uptime[UPTIME_WORDS];       // RTC (seconds)
+    uint32_t        datetime;                   // Date and time since epoch
+    uint32_t        var_a;                      // (Milliseconds)
+    uint32_t        status[STATUS_WORDS];       //
+    uint32_t        var_b;                      //
+    int16_t         temp_c[TEMPER_VALUES];      // (Celsius)
+    int8_t          accel[ACCEL_VALUES];        //
+    uint32_t        var_c;                      //
+    uint32_t        var_d;                      //
+    uint32_t        var_e;                      //
+    uint32_t        var_f;                      //
+    uint32_t        var_g;                      //
+    uint32_t        var_h;                      //
+    uint32_t        var_i;                      //
 }OmnibusMsg_Body;
 
 /* Full Omnibus message control block definition */
