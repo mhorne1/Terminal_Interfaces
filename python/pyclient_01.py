@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2]:
+# In[1]:
 
 
 # "pyclient_01.py <IPv4 or IPv6 addr> <port>"
@@ -49,6 +49,7 @@ if ((ARGC >= 1) and (ARGV[0] != '-f')):
     if ((ARGC >= 2 and isinstance(ARGV[1], str))):
         PORT = int(ARGV[1])
 print(f"host={HOST} port={PORT}")
+
 HEADER_STRING = "!III" # No padding like with "!IHI"
 BUFFER_SIZE = 32
 CONN_ATTEMPTS_MAX = 20 # Temporary
@@ -127,9 +128,9 @@ def client_thread(xhost, xport, xheaderformat, xbuffersize, recvq, sendq,
         #pyclient.send(b"ACK") # Acknowledgement
         if recvq.empty() == False:
             #msg_type = xsendqueue.get()
-            msg_t = recvq.get()
-            print(f"Sending ACK: {msg_t}")
-            sendq.put(msg_t)
+            msg_tup = recvq.get()
+            print(f"Sending ACK: {msg_tup}")
+            sendq.put(msg_tup)
             send_status = mt.send_message(pyclient, xheaderformat,
                                           client_msgnumber, sendq)
             #print(f"send_status: {send_status}")
@@ -156,16 +157,20 @@ def record_thread(rec_queue):
     dir_name = mt.get_datetime_name()
     while True:
         if rec_queue.empty() == False:
-            msg_t = rec_queue.get()
-            msg_type = msg_t[0]
-            msg = msg_t[1]
-            if msg_type == 1:
-                mt.record_text(dir_name, mt.get_timestamp(msg))
-            elif (msg_type == 2) or (msg_type == 50):
-                mt.record_csv(dir_name, msg)
+            msg_tup = rec_queue.get()
+            msg_type = msg_tup[0]
+            message = msg_tup[1]
+            if msg_type == mt.Msgs.text.value:
+                mt.record_text(dir_name, mt.get_timestamp(message))
+            elif msg_type == mt.Msgs.num.value:
+                mt.record_csv(dir_name, message)
+            elif msg_type == mt.Msgs.omnibus.value:
+                mt.record_csv(dir_name, message)
+                
         if clientevent.is_set(): # Check after recording message
             break
-        time.sleep(0.1)
+        else:
+            time.sleep(0.1)
 
 def input_thread(message_queue):
     '''

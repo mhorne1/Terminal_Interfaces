@@ -10,7 +10,17 @@ import time
 import os
 import struct
 import socket
+from enum import Enum
 #import crcmod
+
+class Msgs(Enum):
+    '''
+    Enumeration of pre-defined message types
+    '''
+    text = 1
+    num = 2
+    ack = 3
+    omnibus = 50
 
 def get_message(myqueue):
     '''
@@ -29,9 +39,9 @@ def get_message(myqueue):
     if new_msg == "":
         return status
     elif new_msg[0].isnumeric():
-        if int(new_msg[0]) == 1:
+        if int(new_msg[0]) == Msgs.text.value:
             print(f"Adding message '{new_msg[2:]}' to queue!")
-            myqueue.put((1,new_msg[2:]))
+            myqueue.put((Msgs.text.value,new_msg[2:]))
             status = True
     elif new_msg[0] == 'Q' or new_msg[0] == 'q':
         status = False
@@ -233,9 +243,9 @@ def send_message(send_socket, header_format, msg_number, msg_queue):
     status = 0 # Empty msg_queue
     if not msg_queue.empty():
         full_msg = b""
-        msg_t = msg_queue.get()
-        msg_type = msg_t[0]
-        msg = msg_t[1]
+        msg_tup = msg_queue.get()
+        msg_type = msg_tup[0]
+        msg = msg_tup[1]
         msg_len = -1 # Signify that message is being packed and that length is currently unknown
         msg_pack = True # Pack (True) or Unpack (False) message
         packedmsg = msg_packer(msg_dict, msg_type, msg_len, msg_pack, msg)
@@ -322,18 +332,18 @@ def recv_message(recv_socket, recv_timeout, header_format, buffer_size, recv_que
             msgpack = False # Pack (True) or Unpack (False) message
             unpacked_message = msg_packer(msg_dict, msgtype, msglen, msgpack, full_msg[:msglen])
             print(f"RECV: {unpacked_message}")
-            if msgtype == 3: # Receive ACK
+            if msgtype == Msgs.ack.value: # Receive ACK
                 recv_queue.put(unpacked_message)
             else: # Send ACK
-                recv_queue.put((3,(msglen,msgtype,msgnumber,0)))
+                recv_queue.put((Msgs.ack.value,(msglen,msgtype,msgnumber,0)))
             record_queue.put((msgtype,unpacked_message))
             status = 1
             break
     return status
 
 msg_dict = { # Dispatch table containing message types and corresponding functions
-    1 : msg_type1_pack,
-    2 : msg_type2_pack,
-    3 : msg_type3_pack,
-    50 : msg_omnibus_pack,
+    Msgs.text.value : msg_type1_pack,
+    Msgs.num.value : msg_type2_pack,
+    Msgs.ack.value : msg_type3_pack,
+    Msgs.omnibus.value : msg_omnibus_pack,
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2]:
+# In[1]:
 
 
 # "pyserver_01.py <port>"
@@ -43,12 +43,13 @@ import messagetools as mt
 ARGV = sys.argv[1:]
 ARGC = len(ARGV)
 #print(f"arg0={ARGV[0]}")
-print(type(ARGV[0]))
+#print(type(ARGV[0]))
 HOST = socket.gethostname()
 PORT = 5001 # iPerf
 if ((ARGC >= 1) and (ARGV[0] != '-f')):
     if ((ARGC >= 1) and (isinstance(ARGV[0], str))):
         PORT = int(ARGV[0])
+
 print(f"host={HOST} port={PORT}")
 HEADER_SIZE = 12
 HEADER_FORMAT = "!III" # No padding like with "!IHI"
@@ -120,7 +121,6 @@ def server_thread(xhost, xport, xheaderformat, recvq, sendq, recordq):
                     
                     # Receive sequence
                     try:
-                        #msg_recv = clientsocket.recv(64)
                         recv_status = mt.recv_message(clientsocket, 0.2,
                                                   xheaderformat, xbuffersize,
                                                   recvq, recordq)
@@ -132,9 +132,9 @@ def server_thread(xhost, xport, xheaderformat, recvq, sendq, recordq):
                             #print(msg_recv)
                             #print(f"recv_status: {recv_status}")
                             if recvq.empty() == False:
-                                msg_t = recvq.get()
-                                if msg_t[0] != 3:
-                                    print(f"Received ACK: {msg_t}")
+                                msg_tup = recvq.get()
+                                if msg_tup[0] != mt.Msgs.ack.value:
+                                    print(f"Received ACK: {msg_tup}")
                     except socket.timeout as emsg:
                         #print(f"RECV socket.timeout exception: {emsg}")
                         msg_recv = b""
@@ -170,16 +170,20 @@ def record_thread(rec_queue):
     dir_name = mt.get_datetime_name()
     while True:
         if rec_queue.empty() == False:
-            msg_t = rec_queue.get()
-            msg_type = msg_t[0]
-            msg = msg_t[1]
-            if msg_type == 1:
-                mt.record_text(dir_name, mt.get_timestamp(msg))
-            elif (msg_type == 2) or (msg_type == 50):
-                mt.record_csv(dir_name, msg)
+            msg_tup = rec_queue.get()
+            msg_type = msg_tup[0]
+            message = msg_tup[1]
+            if msg_type == mt.Msgs.text.value:
+                mt.record_text(dir_name, mt.get_timestamp(message))
+            elif msg_type == mt.Msgs.num.value:
+                mt.record_csv(dir_name, message)
+            elif msg_type == mt.Msgs.omnibus.value:
+                mt.record_csv(dir_name, message)
+                
         if serverevent.is_set(): # Check after recording message
             break
-        time.sleep(0.1)
+        else:
+            time.sleep(0.1)
 
 def input_thread(message_queue):
     '''
@@ -229,7 +233,7 @@ while True:
                 #send_q.put((2,(10, 20, 30, 40, 50.12, 60.34, 70.56, 80.78)))
                 
                 # Send default omnibus telemetry message
-                #send_q.put(omni_tmp)
+                send_q.put(omni_tmp)
     except KeyboardInterrupt:
         serverevent.set()
         break
