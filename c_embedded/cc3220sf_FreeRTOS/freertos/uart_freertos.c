@@ -277,10 +277,11 @@ void simpleConsole(UART_Handle uart)
                 break;
             case 'i': // Auto send TCP Client messages with I2C task
                 g_i2cAutoSend = ~g_i2cAutoSend;
+                UART_printf("Auto Send ");
                 if (g_i2cAutoSend) {
-                    UART_printf("Started ");
+                    UART_printf("started\n\r");
                 } else {
-                    UART_printf("Stopped ");
+                    UART_printf("stopped\n\r");
                 }
                 UART_printf("Automatically sending TCP Client messages\n\r");
                 break;

@@ -209,12 +209,16 @@ void i2cTask(void *pvParameters)
             }
         }
 
-        /* Auto send TCP Client messages with I2C task cycle */
+        /* Auto send TCP Client message after I2C task acquires data */
         if (g_i2cAutoSend) {
             if (g_wifiConnectFlag == true) {
+                /*
                 qI2CSend.header = WIFI_dmsg;
                 xQueueSendToBack( xQueue1, &qI2CSend, 0 );
                 qI2CSend.header = WIFI_tcli;
+                xQueueSendToBack( xQueue1, &qI2CSend, 0 );
+                */
+                qI2CSend.header = WIFI_omsg;
                 xQueueSendToBack( xQueue1, &qI2CSend, 0 );
             } else {
                 g_i2cAutoSend = false;
